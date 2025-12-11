@@ -1,0 +1,636 @@
+
+
+import copy
+import random
+import time
+from decimal import *
+
+name_to_attr = {'命中': 'no_miss'}
+
+
+def target_chose(team, mode='min'):
+    hp_rate = []
+    for o in team:
+        hp_rate.append(o.hp_now/o.hp)
+    if mode == 'max':
+        return hp_rate.index(max(hp_rate))
+    else:
+        return hp_rate.index(min(hp_rate))
+
+
+class YuiAgent:
+    def __init__(self, name='', hp=100, atk=10, df=10):
+        self.name = name
+        self.hp = hp
+        self.hp_now = hp
+        self.atk = atk
+        self.df = df
+        self.speed = 100
+        self.no_miss = 100
+        self.critical = 30
+        self.skill = []
+        self.passive = []
+        self.dead = []
+        self.dps = 0
+        self.heal = 0
+        self.hate = 1
+        self.buff = []
+        self.debuff = []
+        self.summon_monster = []
+        self.master = None
+        self.env = None
+        self.evade = False
+        self.energy = 1
+        self.resist = []
+
+    def summon(self, s):
+        self.summon_monster.append(s)
+        s.master = self
+
+    def use_skill(self, skill, t1, t2):
+        fb = False
+        en = self.energy
+        for s in skill:
+            if s.cd_now > 0:
+                s.cd_now -= 1
+                continue
+
+            if self.hp_now / self.hp > s.cond / 100:
+                continue
+
+            if isinstance(s, YuiSummon):
+                for _ in range(s.num):
+                    summon_monster = copy.deepcopy(s.summon)
+                    self.summon(summon_monster)
+                    print(self.name + '召喚了' + summon_monster.name)
+                    if s.is_env:
+                        self.env = summon_monster
+                    else:
+                        t1.append(summon_monster)
+                    s.cd_now = s.cd
+                break
+
+            orbs = []
+            if s.target == 'self':  # 對自己使用
+                orbs = [self]
+                ind = [0]
+            elif s.target == 'friend':  # 對友軍使用
+                if s.range == 3:  # 全體技能
+                    orbs = t1.copy()
+                    ind = [0]
+                else:
+                    t_chose = t1
+                    ind = list(range(len(t_chose)))
+            else:
+                if s.range == 3:  # 全體技能
+                    orbs = t2.copy()
+                    ind = [0]
+                else:
+                    t_chose = t2
+                    ind = []
+                    for i, orb in enumerate(t_chose):
+                        ind.extend([i] * orb.hate)
+
+            if not ind:  # 找不到對象
+                continue
+
+            if orbs:  # 自身技能，全體技能
+                pass
+            elif s.range == 2:  # 範圍攻擊
+                if s.dmg < 0:
+                    i = target_chose(t_chose, 'min')
+                else:
+                    i = random.choice(ind)
+                orbs.append(t_chose[i])
+                i2 = i - 1
+                i3 = i + 1
+                if i2 > 0:
+                    orbs.append(t_chose[i2])
+                if i3 < len(t_chose):
+                    orbs.append(t_chose[i3])
+            else:  # 單體攻擊
+                if s.dmg < 0 or self.name == '琉塔':
+                    i = target_chose(t_chose, 'min')
+                else:
+                    i = random.choice(ind)
+                orbs.append(t_chose[i])
+
+            if s.name == '驅散':
+                print(self.name + '使用驅散')
+            for orb in orbs:
+                if orb.evade:
+                    continue
+
+                s.cd_now = s.cd  # 技能開始冷卻
+                if orb != self:
+                    miss = random.randint(0, 100)
+                    if miss > self.no_miss:
+                        print(self.name + '使用' + s.name + '，但沒有命中' + orb.name)
+                        continue
+                fb = True
+                if s.dmg > 0:
+                    dmg = s.dmg * self.atk / orb.df
+                elif s.dmg < 0:
+                    dmg = s.dmg * self.atk / 10
+                else:
+                    dmg = 0
+                dmg_max = round(dmg * 1.2)
+                dmg_min = round(dmg * 0.8)
+                if dmg > 0:
+                    dmg = random.randint(dmg_min, dmg_max)
+                    c = ''
+                    if random.randint(0, 100) < self.critical:
+                        c = '暴擊'
+                        dmg = round(dmg * 1.5)
+                    print(self.name + '使用' + s.name + '，給' + orb.name + '造成了' + str(dmg) + '點' + c + '傷害')
+                    orb.use_skill(orb.passive, t2, t1)
+                elif dmg < 0:
+                    dmg = random.randint(dmg_max, dmg_min)
+                    print(self.name + '使用' + s.name + '，給' + orb.name + '恢復了' + str(-dmg) + '點生命力')
+                elif s.name == '驅散':
+                    for i in range(len(orb.debuff) - 1, -1, -1):
+                        d = orb.debuff[i]
+                        if d.last == inf:
+                            continue
+                        d.offset(orb)
+                        del orb.debuff[i]
+                        break
+                else:
+                    print(self.name + '使用' + s.name)
+
+                d1 = s.debuff  # 異常狀態
+                if d1:
+                    if d1.name in orb.resist:
+                        print(orb.name + '抵抗了' + d1.name)
+                    elif d1.attr == '防禦力' and d1.dmg >= orb.df:
+                        print('無法繼續降低防禦力')
+                    else:
+                        check = True
+                        if d1.name not in ['中毒', '血怒', '侵蝕']:
+                            for d2 in orb.debuff:
+                                if d1.name == d2.name:
+                                    check = False
+                                    break
+                        if check:
+                            d1 = copy.deepcopy(d1)
+                            d1.source = self
+                            if isinstance(d1, YuiBuff):
+                                orb.buff.append(d1)
+                            else:
+                                orb.debuff.append(d1)
+                            d1.onset(orb)
+
+                orb.hp_now -= dmg
+                if orb.hp_now < 0:
+                    dmg += orb.hp_now
+                    orb.hp_now = 0
+                elif orb.hp_now > orb.hp:
+                    dmg = dmg + orb.hp_now - orb.hp
+                    orb.hp_now = orb.hp
+                if dmg > 0:  # 傷害統計
+                    if self.master:
+                        self.master.dps += dmg
+                    else:
+                        self.dps += dmg
+                elif dmg < 0:
+                    if self.master:
+                        self.master.heal -= dmg
+                    else:
+                        self.heal -= dmg
+
+                if orb.hp_now == 0:
+                    orb.use_skill(orb.dead, t2, t1)
+                    print(orb.name + '死掉了')
+                    t2.remove(orb)
+            en -= s.cost
+            if en == 0:
+                break
+        return fb
+
+    def act(self, t1, t2):
+        fb = False
+        speed_cost = 0
+        while 100 <= self.speed - speed_cost:
+            fb = self.use_skill(self.skill, t1, t2) or fb
+            speed_cost += 100
+        a = random.randint(0, 100)
+        if a < self.speed - speed_cost:
+            fb = self.use_skill(self.skill, t1, t2) or fb
+        if self in t1:
+            for i in range(len(self.buff) - 1, -1, -1):
+                d = self.buff[i]
+                d.last -= 1
+                if d.last == 0:
+                    d.offset(self)
+                    del self.buff[i]
+
+            d_rec = []
+            for i in range(len(self.debuff) - 1, -1, -1):
+                d = self.debuff[i]
+                if d.attr == '傷害' and d.name not in d_rec:
+                    d_rec.append(d.name)
+                    dmg = 0
+                    count = 0
+                    for d2 in self.debuff:
+                        if d2.name == d.name:
+                            count += 1
+                            dmg += d.dmg
+                    dmg_max = round(dmg * 1.2)
+                    dmg_min = round(dmg * 0.8)
+                    dmg = random.randint(dmg_min, dmg_max)
+                    print(self.name + '受到' + str(dmg) + '點' +d.name + '傷害')
+                    self.use_skill(self.passive, t1, t2)
+                    self.hp_now -= dmg
+                    if self.hp_now < 0:
+                        dmg += self.hp_now
+                        self.hp_now = 0
+
+                    source = d.source
+                    if source.master:
+                        source.master.dps += dmg
+                    else:
+                        source.dps += dmg
+
+                    if self.hp_now == 0:
+                        self.use_skill(self.dead, t1, t2)
+                        print(self.name + '死掉了')
+                        t1.remove(self)
+                        break
+
+                d.last -= 1
+                if d.last == 0:
+                    d.offset(self)
+                    del self.debuff[i]
+        if fb:
+            show_hp()
+
+
+class YuiSkill:
+
+    def __init__(self, name='', dmg=10, cd=0, target='ene', r=0):
+        self.name = name
+        self.dmg = dmg
+        self.cd = cd
+        self.cd_now = 0
+        self.target = target
+        self.range = r
+        self.debuff = None
+        self.cond = 100
+        self.cost = 1
+
+
+class YuiSummon(YuiSkill):
+
+    def __init__(self, name='', dmg=10, cd=0, target='ene', r=0, summon=None, num=1):
+        super().__init__(name, dmg, cd, target, r)
+        self.summon = summon
+        self.num = num
+        self.is_env = False
+
+
+class YuiBuff:
+
+    def __init__(self, name='', attr='', dmg=0, last=2):
+        self.name = name
+        self.attr = attr
+        self.dmg = dmg
+        self.last = last
+
+    def onset(self, orb):
+        print(orb.name + '進入了' + self.name + '狀態')
+        if self.attr == '仇恨':
+            orb.hate += self.dmg
+        elif self.attr == '攻擊力':
+            orb.atk += self.dmg
+            print('當前攻擊力', orb.atk)
+        elif self.attr == '速度':
+            orb.speed += self.dmg
+            print('當前速度', orb.speed)
+        elif self.attr == '暴擊':
+            orb.critical += self.dmg
+            print('當前暴擊率', orb.critical)
+        elif self.attr == '迴避':
+            orb.evade = True
+
+    def offset(self, orb):
+        print(orb.name + '解除' + self.name + '狀態')
+        if self.attr == '仇恨':
+            orb.hate -= self.dmg
+        elif self.attr == '攻擊力':
+            orb.atk -= self.dmg
+            print('當前攻擊力', orb.atk)
+        elif self.attr == '速度':
+            orb.speed -= self.dmg
+            print('當前速度', orb.speed)
+        elif self.attr == '暴擊':
+            orb.critical -= self.dmg
+            print('當前暴擊率', orb.critical)
+        elif self.attr == '迴避':
+            orb.evade = False
+
+
+class YuiDebuff:
+
+    def __init__(self, name='', attr='', dmg=0, last=2):
+        self.name = name
+        self.attr = attr
+        self.dmg = dmg
+        self.last = last
+        self.source = None
+
+    def onset(self, orb):
+        print(orb.name + '陷入了' + self.name + '狀態')
+        if self.attr == '命中':
+            orb.no_miss -= self.dmg
+        elif self.attr == '防禦力':
+            orb.df -= self.dmg
+            print('當前防禦力', orb.df)
+
+    def offset(self, orb):
+        print(orb.name + '從' + self.name + '狀態中恢復')
+        if self.attr == '命中':
+            orb.no_miss += self.dmg
+        elif self.attr == '防禦力':
+            orb.df += self.dmg
+            print('當前防禦力', orb.df)
+
+
+inf = Decimal('inf')
+
+belos = YuiAgent('貝羅斯', hp=120, atk=20, df=20)
+s = YuiSkill('挑釁', target='self', dmg=0, cd=4)
+s.debuff = YuiBuff('挑釁', '仇恨', 2, last=2)
+s.cost = 0
+belos.skill.append(s)
+belos.skill.append(YuiSkill('球狀閃電', dmg=20, cd=2, r=2))
+belos.skill.append(YuiSkill('錘擊'))
+
+celexib = YuiAgent('塞萊茜布', hp=90, atk=15, df=12)
+celexib.skill.append(YuiSkill('群體治療', -15, target='friend', r=2, cd=2))
+celexib.skill.append(YuiSkill('寒冰飛彈', dmg=20, cd=2))
+celexib.skill.append(YuiSkill('治療', -20, target='friend'))
+
+regina = YuiAgent('蕾吉娜', hp=110, atk=20, df=15)
+s = YuiSkill('狂化', target='self', dmg=0, cd=5)
+s.debuff = YuiBuff('狂化', '攻擊力', 10, last=3)
+s.cost = 0
+regina.skill.append(s)
+regina.skill.append(YuiSkill('獅吼功', dmg=20, cd=2, r=2))
+regina.skill.append(s)
+regina.skill.append(YuiSkill('劈砍'))
+s = YuiSkill('血怒', target='self', dmg=0)
+s.debuff = YuiBuff('血怒', '攻擊力', 5, last=3)
+regina.passive.append(s)
+
+donnet = YuiAgent('喬恩', hp=100, atk=12, df=12)
+drone = YuiAgent('無人機', hp=1, atk=12, df=15)
+drone.resist.append('中毒')
+drone.skill.append(YuiSkill('機槍掃射'))
+donnet.skill.append(YuiSummon('召喚無人機', cd=2, summon=drone))
+donnet.skill.append(YuiSkill('重踢'))
+elion = YuiAgent('艾莉安', hp=110, atk=20, df=15)
+elion.skill.append(YuiSkill('砲擊'))
+elion.resist.append('中毒')
+donnet.summon(elion)
+
+willianna = YuiAgent('薇莉安娜', hp=100, atk=20, df=12)
+s = YuiSkill('速射', target='self', dmg=0, cd=5)
+s.debuff = YuiBuff('速射', '速度', 50, last=3)
+s.cost = 0
+willianna.skill.append(s)
+willianna.skill.append(YuiSkill('雲爆箭', dmg=20, cd=4, r=2))
+s = YuiSkill('汽油箭', dmg=20, cd=2)
+s.debuff = YuiDebuff('燃燒', '傷害', 5, last=3)
+willianna.skill.append(s)
+willianna.skill.append(YuiSkill('射擊'))
+
+lyuda = YuiAgent('琉塔', hp=100, atk=20, df=12)
+s = YuiSkill('專注', target='self', dmg=0, cd=5)
+s.debuff = YuiBuff('專注', '暴擊', 30, last=3)
+s.cost = 0
+lyuda.skill.append(s)
+s = YuiSkill('穿甲彈', dmg=20, cd=3)
+s.debuff = YuiDebuff('破防', '防禦力', 2, last=3)
+lyuda.skill.append(s)
+lyuda.skill.append(YuiSkill('狙擊', dmg=20))
+
+eurora = YuiAgent('歐若拉', hp=100, atk=15, df=15)
+s = YuiSkill('鼓舞', dmg=0, cd=4, r=3, target='friend')
+s.debuff = YuiBuff('鼓舞', '攻擊力', 5, 2)
+eurora.skill.append(s)
+eurora.skill.append(YuiSkill('治療', -20, target='friend', cd=1))
+eurora.skill.append(YuiSkill('杖擊'))
+
+harald = YuiAgent('哈拉爾德', hp=120, atk=15, df=20)
+s = YuiSkill('挑釁', target='self', dmg=0, cd=4)
+s.debuff = YuiBuff('挑釁', '仇恨', 2, last=2)
+s.cost = 0
+harald.skill.append(s)
+harald.skill.append(YuiSkill('鐳射', dmg=20, cd=3))
+harald.skill.append(YuiSkill('治療', -15, cd=1, target='friend'))
+harald.skill.append(YuiSkill('棍擊'))
+
+magret = YuiAgent('瑪格麗特', hp=100, atk=20, df=12)
+s = YuiSkill('強攻', target='self', dmg=0, cd=5)
+s.debuff = YuiBuff('強攻', '攻擊力', 10, last=3)
+s.cost = 0
+magret.skill.append(s)
+magret.skill.append(YuiSkill('鐳射', dmg=20, cd=3))
+magret.skill.append(YuiSkill('治療', -20, target='friend', cd=2))
+magret.skill.append(YuiSkill('射擊'))
+
+dominion = YuiAgent('多米妮安', hp=90, atk=20, df=12)
+s = YuiSkill('驅散', dmg=0, target='friend', r=2, cd=2)
+s.cost = 0
+dominion.skill.append(s)
+dominion.skill.append(YuiSkill('治療', -15, cd=1, target='friend'))
+dominion.skill.append(YuiSkill('劈砍'))
+
+# boss
+
+sirius = YuiAgent('西里烏斯', hp=1200, atk=18, df=15)
+s = YuiSkill('氦閃衝擊', dmg=40, cd=inf, r=3)
+s.cond = 50
+s.debuff = YuiDebuff('致盲', '命中', 30, 2)
+sirius.skill.append(s)
+s = YuiSkill('閃光彈', dmg=0, cd=4, r=3)
+s.debuff = YuiDebuff('致盲', '命中', 30, 2)
+sirius.skill.append(s)
+sirius.skill.append(YuiSkill('鐳射掃描', dmg=30, cd=1, r=2))
+sirius.skill.append(YuiSkill('治療', -20, target='friend', r=2))
+
+bouya = YuiAgent('少爺', hp=800, atk=20, df=15)
+bouya.critical = 50
+
+s = YuiSkill('無限劍製', dmg=40, cd=inf, r=3)
+s.cond = 50
+bouya.skill.append(s)
+
+s = YuiSkill('隱身', target='self', dmg=0, cd=4)
+s.debuff = YuiBuff('隱身', '迴避', last=2)
+s.cost = 0
+bouya.skill.append(s)
+
+shadow = YuiAgent('影分身', hp=1, atk=20, df=15)
+shadow.critical = 50
+s = YuiSkill('隱身', target='self', dmg=0, cd=4)
+s.debuff = YuiBuff('隱身', '迴避', last=2)
+s.cost = 0
+shadow.skill.append(s)
+shadow.skill.append(YuiSkill('劈砍'))
+bouya.skill.append(YuiSummon('影分身', cd=4, summon=shadow, num=4))
+bouya.skill.append(YuiSkill('劈砍'))
+
+kaeda = YuiAgent('卡伊達', hp=600, atk=15, df=15)
+bomb = YuiAgent('炸彈', hp=1, atk=15, df=15)
+bomb.dead.append(YuiSkill('爆炸', dmg=15, r=2))
+kaeda.skill.append(YuiSummon('設置炸彈', summon=bomb))
+kaeda.dead.append(YuiSkill('核地雷自爆', dmg=30, cd=inf, r=3))
+
+adeak = YuiAgent('阿蒂雅', hp=600, atk=15, df=15)
+adeak.skill.append(YuiSkill('投擲手雷', dmg=20))
+adeak.dead.append(YuiSkill('核地雷自爆', dmg=30, cd=inf, r=3))
+
+
+andreas = YuiAgent('安朵蕾雅絲', hp=1000, atk=20, df=15)
+s = YuiSkill('鑽地', target='self', dmg=0, cd=4)
+s.debuff = YuiBuff('鑽地', '迴避', last=2)
+s.cost = 0
+andreas.skill.append(s)
+earthquake = YuiAgent('地震', hp=1, atk=20, df=0)
+earthquake.skill.append(YuiSkill('震動', r=3))
+s = YuiSummon('地震', cd=inf, summon=earthquake)
+s.is_env = True
+s.cond = 50
+andreas.skill.append(s)
+andreas.skill.append(YuiSkill('拋石車', dmg=30, cd=2, r=2))
+andreas.skill.append(YuiSkill('重踢'))
+
+
+hammett = YuiAgent('煉金術師哈米特', hp=1200, atk=18, df=15)
+hammett.resist.append('侵蝕')
+s = YuiSkill('六氟銻酸雨', dmg=25, cd=inf, r=3)
+s.cond = 50
+s.debuff = YuiDebuff('侵蝕', '防禦力', 1, last=inf)
+hammett.skill.append(s)
+s = YuiSkill('強氧化劑', dmg=20, cd=3, r=2)
+s.debuff = YuiDebuff('燃燒', '傷害', 5, last=3)
+s = YuiSkill('六氟銻酸', dmg=25, cd=1, r=2)
+s.debuff = YuiDebuff('侵蝕', '防禦力', 1, last=3)
+hammett.skill.append(s)
+hammett.skill.append(YuiSkill('坩堝鉗'))
+
+
+covid = YuiAgent('克維德', hp=1200, atk=20, df=15)
+covid.resist.append('中毒')
+s = YuiSkill('毒氣', dmg=0, cd=inf, r=3)
+s.cond = 50
+s.debuff = YuiDebuff('中毒', '傷害', 10, last=inf)
+covid.skill.append(s)
+s = YuiSkill('多重毒箭', cd=1, r=2)
+s.debuff = YuiDebuff('中毒', '傷害', 10, last=3)
+covid.skill.append(s)
+s = YuiSkill('毒箭射擊')
+s.debuff = YuiDebuff('中毒', '傷害', 10, last=3)
+covid.skill.append(s)
+
+
+tambora = YuiAgent('炎蛇坦博拉', hp=1200, atk=20, df=15)
+tambora.resist.append('燃燒')
+volcano = YuiAgent('火山噴發', hp=1, atk=15, df=0)
+volcano.skill.append(YuiSkill('火山灰流', dmg=30, cd=inf, r=3))
+volcano.skill.append(YuiSkill('浮石打擊', r=3))
+s = YuiSummon('火山噴發', cd=inf, summon=volcano)
+s.is_env = True
+s.cond = 50
+tambora.skill.append(s)
+tambora.skill.append(YuiSkill('火炎噴射', dmg=12, cd=2, r=2))
+tambora.skill.append(YuiSkill('撕咬'))
+s = YuiSkill('血怒', target='self', dmg=0)
+s.debuff = YuiBuff('血怒', '攻擊力', 1, last=3)
+tambora.passive.append(s)
+
+
+def add_summon(t):
+    for mem in t:
+        for s in mem.summon_monster:
+            t.append(s)
+
+
+#t1 = [belos, dominion, regina, willianna, donnet]
+#t2 = [covid]
+t1 = [lyuda]
+t2 = [willianna]
+
+all = t1 + t2
+
+add_summon(t1)
+add_summon(t2)
+
+
+def show_hp():
+    hp_all = '當前hp："\n"'
+    for a in t1 + t2:
+        hp_all += a.name
+        hp_all += '：'
+        hp_all += str(a.hp_now)
+        hp_all += '/'
+        hp_all += str(a.hp)
+        hp_all += '，'
+    hp_all = hp_all[:-1]
+    print('')
+    print(hp_all)
+    print('')
+
+
+count = 1
+while 1:
+    print('第' + str(count) + '回合')
+    random.shuffle(t1)
+    random.shuffle(t2)
+    for a in t1:
+        if a.env:
+            a.env.act(t1, t2)
+    for a in t2:
+        if a.env:
+            a.env.act(t2, t1)
+    for a in t1:
+        a.act(t1, t2)
+        #time.sleep(0.5)
+    for a in t2:
+        a.act(t2, t1)
+        #time.sleep(0.5)
+    if not t1 and not t2:
+        print('同歸於盡')
+        break
+    if not t1:
+        print('隊伍2勝利')
+        break
+    if not t2:
+        print('隊伍1勝利')
+        break
+    count += 1
+
+print('總回合', count)
+
+hp_all = '傷害統計："\n"'
+for a in all:
+    hp_all += a.name
+    hp_all += '：'
+    hp_all += str(a.dps)
+    hp_all += '，'
+hp_all = hp_all[:-1]
+print('')
+print(hp_all)
+print('')
+
+hp_all = '治療統計："\n"'
+for a in all:
+    hp_all += a.name
+    hp_all += '：'
+    hp_all += str(a.heal)
+    hp_all += '，'
+hp_all = hp_all[:-1]
+print('')
+print(hp_all)
+print('')
