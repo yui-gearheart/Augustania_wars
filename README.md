@@ -1,6 +1,6 @@
 安裝方法：
 1.下載遊戲文件（yui_game.py）和數據文件夾（game_data）
-2.將yui_game.py第9行的yui_dir = 'D:/game_data/'後面的路徑改為數據文件夾的保存位置
+2.將yui_game.py第9行的yui_dir = 'game_data/'改為數據文件夾的實際路徑
 3.運行yui_game.py
 
 使用方法：
