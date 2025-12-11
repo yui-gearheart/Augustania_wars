@@ -906,6 +906,15 @@ class YuiStart(threading.Thread):
         threading.Thread.__init__(self, daemon=True)
         self.stop = False
 
+    def check_stop(self):
+        global ongoing
+        if self.stop:
+            battle_disp('')
+            battle_disp('戰鬥中止')
+            battle_disp('')
+            return True
+        return False
+
     def run(self):
         global ongoing
         t1_tmp = [copy.deepcopy(all_hero[x]) for x in t1 if x]
@@ -914,6 +923,7 @@ class YuiStart(threading.Thread):
         add_summon(t1_tmp)
         add_summon(t2_tmp)
         count = 1
+        stop = False
         while 1:
             battle_disp('')
             battle_disp('第' + str(count) + '回合')
@@ -923,13 +933,33 @@ class YuiStart(threading.Thread):
             for a in t1_tmp:
                 if a.env:
                     a.env.act(t1_tmp, t2_tmp)
+                    if self.check_stop():
+                        stop = True
+                        break
+            if stop:
+                break
             for a in t2_tmp:
                 if a.env:
                     a.env.act(t2_tmp, t1_tmp)
+                    if self.check_stop():
+                        stop = True
+                        break
+            if stop:
+                break
             for a in t1_tmp:
                 a.act(t1_tmp, t2_tmp)
+                if self.check_stop():
+                    stop = True
+                    break
+            if stop:
+                break
             for a in t2_tmp:
                 a.act(t2_tmp, t1_tmp)
+                if self.check_stop():
+                    stop = True
+                    break
+            if stop:
+                break
             if not t1_tmp and not t2_tmp:
                 battle_disp('同歸於盡，挑戰失敗')
                 break
@@ -939,12 +969,7 @@ class YuiStart(threading.Thread):
             if not t2_tmp:
                 battle_disp('挑戰成功')
                 break
-            if self.stop:
-                battle_disp('')
-                battle_disp('戰鬥中止')
-                battle_disp('')
-                ongoing = []
-                break
+
             count += 1
 
         battle_disp('總回合' + str(count))
