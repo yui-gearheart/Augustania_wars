@@ -296,13 +296,10 @@ class YuiBuff:
             orb.hate += self.dmg
         elif self.attr == '攻擊力':
             orb.atk += self.dmg
-            battle_disp('當前攻擊力' + str(orb.atk))
         elif self.attr == '速度':
             orb.speed += self.dmg
-            battle_disp('當前速度' + str(orb.speed))
         elif self.attr == '暴擊':
             orb.critical += self.dmg
-            battle_disp('當前暴擊率' + str(orb.critical))
         elif self.attr == '迴避':
             orb.evade = True
 
