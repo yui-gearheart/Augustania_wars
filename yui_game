@@ -1019,6 +1019,7 @@ def start_battle():
                     cd = 0.5
                 else:
                     cd = 0
+                yui_discourse.delete("1.0", tk.END)
                 yui_start = YuiStart()
                 ongoing.append(yui_start)
                 yui_start.start()
