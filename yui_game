@@ -77,38 +77,37 @@ class YuiAgent:
                 ind = [0]
             elif s.target == 'friend':  # 對友軍使用
                 if s.range == 3:  # 全體技能
-                    orbs = t1.copy()
+                    orbs = [x for x in t1 if x.hp_now > 0]
                     ind = list(range(len(orbs)))
                 else:
-                    t_chose = t1
+                    t_chose = [x for x in t1 if x.hp_now > 0]
                     ind = list(range(len(t_chose)))
             else:
                 if s.range == 3:  # 全體技能
-                    orbs = t2.copy()
+                    orbs = [x for x in t2 if x.hp_now > 0]
                     ind = list(range(len(orbs)))
                 else:
-                    t_chose = t2
+                    t_chose = [x for x in t2 if x.hp_now > 0]
                     ind = []
                     for i, orb in enumerate(t_chose):
                         ind.extend([i] * orb.hate)
 
-            if not ind:  # 找不到對象
+            if not ind:
                 continue
 
-            if orbs:  # 自身技能，全體技能
+            if orbs or s.range == 3:  # 自身技能，全體技能
                 pass
             elif s.range == 2:  # 範圍攻擊
-                if s.dmg < 0:
+                if s.dmg < 0:  # 治療
                     i = target_chose(t_chose, 'min')
                 else:
                     i = random.choice(ind)
                 orbs.append(t_chose[i])
-                i2 = i - 1
-                i3 = i + 1
-                if i2 > 0:
-                    orbs.append(t_chose[i2])
-                if i3 < len(t_chose):
-                    orbs.append(t_chose[i3])
+                ind = list(set(ind))
+                random.shuffle(ind)
+                ind.remove(i)
+                for i in ind[:2]:
+                    orbs.append(t_chose[i])
             else:  # 單體攻擊
                 if s.dmg < 0 or self.name == '琉塔':
                 #if s.dmg < 0 or self.name == 'リューダ':
@@ -149,6 +148,18 @@ class YuiAgent:
                     battle_disp(self.name + '使用' + s.name + '，給' + orb.name + '造成了' + str(dmg) + '點' + c + '傷害')
                     #battle_disp(self.name + 'が' + s.name + 'を使った' + '、' + orb.name + 'に'+ str(dmg) + 'の' + c + 'ダメージを与えた')
                     orb.use_skill(orb.passive, t2, t1)
+                    if orb.name == '黃泉引路人':
+                        curse = max(1, int(dmg * 0.3))
+                        battle_disp(self.name + '受到詛咒，受到了' + str(curse) + '點傷害')
+                        self.hp_now -= curse
+                        if self.hp_now < 0:
+                            curse += self.hp_now
+                            self.hp_now = 0
+                        orb.dps += curse
+                        update_hp_text(self)
+                        if self.hp_now == 0:
+                            self.use_skill(orb.dead, t2, t1)
+                            battle_disp(self.name + '死掉了')
                     if s.name == '集束炸彈':
                         summon_monster = copy.deepcopy(mini_bomb)
                         self.summon(summon_monster)
@@ -163,7 +174,7 @@ class YuiAgent:
                 # elif s.name == '解除':
                     for i in range(len(orb.debuff) - 1, -1, -1):
                         d = orb.debuff[i]
-                        if d.last == inf:
+                        if d.last == inf or d.name == '死亡宣告':
                             continue
                         d.offset(orb)
                         del orb.debuff[i]
@@ -213,13 +224,17 @@ class YuiAgent:
                 if orb.hp_now == 0:
                     orb.use_skill(orb.dead, t2, t1)
                     battle_disp(orb.name + '死掉了')
-                    t2.remove(orb)
             en -= s.cost
             if en == 0:
                 break
 
     def act(self, t1, t2):
         speed_cost = 0
+        for d in self.debuff:
+            if d.name == '恐懼':
+                battle_disp(self.name + '受到' + d.name + '的影響，無法行動')
+                speed_cost += inf
+                break
         while 100 <= self.speed - speed_cost:
             self.use_skill(self.skill, t1, t2)
             speed_cost += 100
@@ -265,13 +280,22 @@ class YuiAgent:
                     if self.hp_now == 0:
                         self.use_skill(self.dead, t1, t2)
                         battle_disp(self.name + '死掉了')
-                        t1.remove(self)
                         break
 
                 d.last -= 1
                 if d.last == 0:
                     d.offset(self)
                     del self.debuff[i]
+                    if d.name == '死亡宣告':
+                        battle_disp(self.name + '受到死亡宣告的影響，受到了9999點傷害')
+                        battle_disp(self.name + '死掉了')
+                        for a in t1 + t2:
+                            if a.name == '黃泉引路人':
+                                a.dps += self.hp_now
+                                break
+                        self.hp_now = 0
+                        update_hp_text(self)
+                        self.use_skill(self.dead, t1, t2)
 
 
 class YuiSkill:
@@ -351,7 +375,8 @@ class YuiDebuff:
             orb.critical -= self.dmg
 
     def offset(self, orb):
-        battle_disp(orb.name + '從' + self.name + '狀態中恢復')
+        if self.name != '死亡宣告':
+            battle_disp(orb.name + '從' + self.name + '狀態中恢復')
         if self.attr == '命中':
             orb.no_miss += self.dmg
         elif self.attr == '防禦力':
@@ -370,8 +395,8 @@ belos.skill.append(s)
 belos.skill.append(YuiSkill('球狀閃電', dmg=20, cd=2, r=2))
 belos.skill.append(YuiSkill('錘擊'))
 
-celexib = YuiAgent('塞萊茜布', hp=90, atk=15, df=12)
-celexib.skill.append(YuiSkill('群體治療', -10, target='friend', r=2, cd=2))
+celexib = YuiAgent('塞萊茜布', hp=90, atk=15, df=15)
+celexib.skill.append(YuiSkill('群體治療', -15, target='friend', r=2, cd=2))
 celexib.skill.append(YuiSkill('寒冰飛彈', dmg=20, cd=2))
 celexib.skill.append(YuiSkill('治療', -15, target='friend'))
 
@@ -423,7 +448,7 @@ eurora = YuiAgent('歐若拉', hp=100, atk=15, df=15)
 s = YuiSkill('鼓舞', dmg=0, cd=4, r=3, target='friend')
 s.debuff = YuiBuff('鼓舞', '攻擊力', 5, 2)
 eurora.skill.append(s)
-eurora.skill.append(YuiSkill('治療', -15, target='friend', cd=1))
+eurora.skill.append(YuiSkill('治療', -20, target='friend', cd=1))
 s = YuiSkill('杖擊')
 s.cost = 0
 eurora.skill.append(s)
@@ -435,7 +460,7 @@ s.debuff = YuiBuff('挑釁', '仇恨', 2, last=2)
 s.cost = 0
 harald.skill.append(s)
 harald.skill.append(YuiSkill('鐳射', dmg=20, cd=3))
-harald.skill.append(YuiSkill('治療', -10, cd=1, target='friend'))
+harald.skill.append(YuiSkill('治療', -15, cd=1, target='friend'))
 harald.skill.append(YuiSkill('棍擊'))
 
 magret = YuiAgent('瑪格麗特', hp=100, atk=20, df=12)
@@ -458,11 +483,11 @@ elijah.skill.append(s)
 elijah.skill.append(YuiSkill('重鉻酸洗液', dmg=20, cd=1, r=2))
 elijah.skill.append(YuiSkill('杖擊'))
 
-dominion = YuiAgent('多米妮安', hp=90, atk=20, df=12)
+dominion = YuiAgent('多米妮安', hp=90, atk=20, df=15)
 s = YuiSkill('驅散', dmg=0, target='friend', r=2, cd=2)
 s.cost = 0
 dominion.skill.append(s)
-dominion.skill.append(YuiSkill('治療', -15, cd=1, target='friend'))
+dominion.skill.append(YuiSkill('治療', -20, cd=1, target='friend'))
 dominion.skill.append(YuiSkill('劈砍'))
 
 ligeia = YuiAgent('莉姬亞', hp=100, atk=20, df=12)
@@ -480,7 +505,8 @@ ligeia.skill.append(s)
 
 # boss
 
-sirius = YuiAgent('西里烏斯', hp=1200, atk=18, df=15)
+sirius = YuiAgent('西里烏斯', hp=1200, atk=15, df=15)
+sirius.resist.append('致盲')
 s = YuiSkill('氦閃衝擊', dmg=40, cd=inf, r=3)
 s.cond = 50
 s.debuff = YuiDebuff('致盲', '命中', 30, 2)
@@ -494,17 +520,14 @@ sirius.skill.append(YuiSkill('治療', -20, target='friend'))
 
 bouya = YuiAgent('少爺', hp=900, atk=20, df=15)
 bouya.critical = 50
-
 s = YuiSkill('無限劍製', dmg=40, cd=inf, r=3)
 s.cond = 50
 bouya.skill.append(s)
-
 s = YuiSkill('隱身', target='self', dmg=0, cd=4)
 s.debuff = YuiBuff('隱身', '迴避', last=2)
 s.cost = 0
 bouya.skill.append(s)
-
-shadow = YuiAgent('影分身', hp=1, atk=17, df=15)
+shadow = YuiAgent('影分身', hp=1, atk=20, df=15)
 shadow.critical = 50
 s = YuiSkill('隱身', target='self', dmg=0, cd=4)
 s.debuff = YuiBuff('隱身', '迴避', last=2)
@@ -526,6 +549,18 @@ adeak.dead.append(YuiSkill('核地雷自爆', dmg=30, cd=inf, r=3))
 mini_bomb = YuiAgent('子炸彈', hp=1, atk=15, df=15)
 mini_bomb.dead.append(YuiSkill('爆炸', dmg=15))
 
+way_guider = YuiAgent('黃泉引路人', hp=1200, atk=20, df=15)
+s = YuiSkill('死亡宣告', dmg=0, cd=inf, r=3)
+s.debuff = YuiDebuff('死亡宣告', last=12)
+s.cost = 0
+way_guider.skill.append(s)
+s = YuiSkill('精神污染', dmg=0, cd=2)
+s.debuff = YuiDebuff('恐懼', last=1)
+s.cost = 0
+way_guider.skill.append(s)
+way_guider.skill.append(YuiSkill('靈魂爆破', dmg=20, cd=2, r=2))
+way_guider.skill.append(YuiSkill('匕首捅刺'))
+
 andreas = YuiAgent('安朵蕾雅絲', hp=1200, atk=20, df=15)
 s = YuiSkill('鑽地', target='self', dmg=0, cd=4)
 s.debuff = YuiBuff('鑽地', '迴避', last=2)
@@ -544,12 +579,12 @@ hammett = YuiAgent('哈密特', hp=1200, atk=18, df=15)
 hammett.resist.append('侵蝕')
 s = YuiSkill('六氟銻酸雨', dmg=30, cd=inf, r=3)
 s.cond = 50
-s.debuff = YuiDebuff('侵蝕', '防禦力', 5, last=inf)
+s.debuff = YuiDebuff('侵蝕', '防禦力', 2, last=inf)
 hammett.skill.append(s)
 s = YuiSkill('強氧化劑', dmg=20, cd=3, r=2)
 s.debuff = YuiDebuff('燃燒', '傷害', 5, last=3)
 hammett.skill.append(s)
-s = YuiSkill('六氟銻酸', dmg=25, cd=1, r=2)
+s = YuiSkill('六氟銻酸', dmg=20, cd=1, r=2)
 s.debuff = YuiDebuff('侵蝕', '防禦力', 2, last=3)
 hammett.skill.append(s)
 hammett.skill.append(YuiSkill('坩堝鉗'))
@@ -598,7 +633,8 @@ window.geometry('1000x600')
 all_hero = {'貝羅斯': belos, '塞萊茜布': celexib, '蕾吉娜': regina, '喬恩': donnet, '艾莉安': elion,
             '薇莉安娜': willianna, '琉塔': lyuda, '哈拉爾德': harald, '瑪格麗特': magret, '歐若拉': eurora,
             '伊利亞': elijah, '多米妮安': dominion, '莉姬亞': ligeia,
-            '西里烏斯': sirius, '少爺': bouya, '卡伊達': kaeda, '阿蒂雅': adeak, '安朵蕾雅絲': andreas,
+            '西里烏斯': sirius, '少爺': bouya, '卡伊達': kaeda, '阿蒂雅': adeak, '黃泉引路人': way_guider,
+            '安朵蕾雅絲': andreas,
             '哈密特': hammett, '克維德': covid, '坦博拉': tambora}
 
 t1 = [None, None, None, None, None]
@@ -738,6 +774,7 @@ images = {
     "少爺": load_image(yui_dir + "少爺.png"),
     "卡伊達": load_image(yui_dir + "卡伊達.png"),
     "阿蒂雅": load_image(yui_dir + "阿蒂雅.png"),
+    "黃泉引路人": load_image(yui_dir + "黃泉引路人.png"),
     "安朵蕾雅絲": load_image(yui_dir + "安朵蕾雅絲.png"),
     "哈密特": load_image(yui_dir + "哈密特.png"),
     "克維德": load_image(yui_dir + "克維德.png"),
@@ -923,6 +960,7 @@ menu6 = tk.Menu(window, tearoff=False)
 menu6.add_command(label="西里烏斯（治療型）", command=lambda: add_boss('西里烏斯'))
 menu6.add_command(label="少爺（刺客型）", command=lambda: add_boss('少爺'))
 menu6.add_command(label="卡伊達＆阿蒂雅（陷阱型）", command=lambda: add_boss('卡伊達'))
+menu6.add_command(label="黃泉引路人（詛咒型）", command=lambda: add_boss('黃泉引路人'))
 menu6.add_command(label="安朵蕾雅絲（群攻法師型）", command=lambda: add_boss('安朵蕾雅絲'))
 menu6.add_command(label="哈密特（弱化型）", command=lambda: add_boss('哈密特'))
 menu6.add_command(label="克維德（持續傷害型）", command=lambda: add_boss('克維德'))
@@ -1010,14 +1048,16 @@ class YuiStart(threading.Thread):
             if stop:
                 break
             for a in t1_tmp:
-                a.act(t1_tmp, t2_tmp)
+                if a.hp_now > 0:
+                    a.act(t1_tmp, t2_tmp)
                 if self.check_stop():
                     stop = True
                     break
             if stop:
                 break
             for a in t2_tmp:
-                a.act(t2_tmp, t1_tmp)
+                if a.hp_now > 0:
+                    a.act(t2_tmp, t1_tmp)
                 if self.check_stop():
                     stop = True
                     break
@@ -1026,11 +1066,11 @@ class YuiStart(threading.Thread):
             t1_alive = False
             t2_alive = False
             for a in t1_tmp:
-                if not a.master:
+                if not a.master and a.hp_now > 0:
                     t1_alive = True
                     break
             for a in t2_tmp:
-                if not a.master:
+                if not a.master and a.hp_now > 0:
                     t2_alive = True
                     break
 
@@ -1042,9 +1082,12 @@ class YuiStart(threading.Thread):
                 break
             elif not t2_alive:
                 battle_disp('挑戰成功')
+                #stat[1] += 1
                 break
 
             count += 1
+
+        #print('挑戰/勝利', stat)
 
         battle_disp('總回合' + str(count))
 
@@ -1057,7 +1100,6 @@ class YuiStart(threading.Thread):
         hp_all = hp_all[:-1]
         battle_disp('')
         battle_disp(hp_all)
-        battle_disp('')
 
         hp_all = '治療統計："\n"'
         for a in all:
@@ -1068,7 +1110,6 @@ class YuiStart(threading.Thread):
         hp_all = hp_all[:-1]
         battle_disp('')
         battle_disp(hp_all)
-        battle_disp('')
         with lock:
             ongoing = []
 
@@ -1098,12 +1139,17 @@ def start_battle():
                 ongoing.append(yui_start)
                 yui_start.start()
 
+                #stat[0] += 1
+
 
 def stop_battle():
     global ongoing
     with lock:
         if ongoing:
             ongoing[0].stop = True
+
+
+#stat = [0, 0]
 
 
 b1 = tk.Button(window, text='開始戰鬥', font=('Arial', 12), width=10, height=1, command=start_battle)
