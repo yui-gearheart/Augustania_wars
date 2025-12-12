@@ -45,6 +45,8 @@ BOSS介紹：
 
 <img width="772" height="928" alt="image" src="https://github.com/user-attachments/assets/c6ba37be-b17c-4445-ae2a-eeaf9145e51b" />
 
+<img width="776" height="688" alt="image" src="https://github.com/user-attachments/assets/319cf8a2-0c3b-4a55-aaa8-a5de470614ca" />
+
 <img width="774" height="710" alt="image" src="https://github.com/user-attachments/assets/17e2ed6f-a502-4f0c-a44f-92f2d0d2209b" />
 
 <img width="800" height="854" alt="image" src="https://github.com/user-attachments/assets/eb153c2f-b965-45b3-943e-6702c7d520d2" />
