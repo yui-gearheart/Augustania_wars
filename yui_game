@@ -6,7 +6,8 @@ import random
 import time
 from decimal import *
 
-yui_dir = 'game_data/'
+yui_dir = 'D:/game_data/'
+
 
 def target_chose(team, mode='min'):
     hp_rate = []
@@ -62,6 +63,7 @@ class YuiAgent:
                     summon_monster = copy.deepcopy(s.summon)
                     self.summon(summon_monster)
                     battle_disp(self.name + '召喚了' + summon_monster.name)
+                    #battle_disp(self.name + 'が' + summon_monster.name + 'を召喚した')
                     if s.is_env:
                         self.env = summon_monster
                     else:
@@ -109,6 +111,7 @@ class YuiAgent:
                     orbs.append(t_chose[i3])
             else:  # 單體攻擊
                 if s.dmg < 0 or self.name == '琉塔':
+                #if s.dmg < 0 or self.name == 'リューダ':
                     i = target_chose(t_chose, 'min')
                 else:
                     i = random.choice(ind)
@@ -116,6 +119,7 @@ class YuiAgent:
 
             if s.dmg == 0:
                 battle_disp(self.name + '使用' + s.name)
+                #battle_disp(self.name + 'が' + s.name + 'を使った')
             for orb in orbs:
                 if orb.evade:
                     continue
@@ -125,6 +129,7 @@ class YuiAgent:
                     miss = random.randint(0, 100)
                     if miss > self.no_miss:
                         battle_disp(self.name + '使用' + s.name + '，但沒有命中' + orb.name)
+                        #battle_disp(self.name + 'が' + s.name + 'を使った' + '、しかし' + orb.name + 'に当たらなかった')
                         continue
                 if s.dmg > 0:
                     dmg = max(1, s.dmg + self.atk - orb.df)
@@ -139,13 +144,23 @@ class YuiAgent:
                     c = ''
                     if random.randint(0, 100) < self.critical:
                         c = '暴擊'
+                        #c = '会心'
                         dmg = round(dmg * 1.5)
                     battle_disp(self.name + '使用' + s.name + '，給' + orb.name + '造成了' + str(dmg) + '點' + c + '傷害')
+                    #battle_disp(self.name + 'が' + s.name + 'を使った' + '、' + orb.name + 'に'+ str(dmg) + 'の' + c + 'ダメージを与えた')
                     orb.use_skill(orb.passive, t2, t1)
+                    if s.name == '集束炸彈':
+                        summon_monster = copy.deepcopy(mini_bomb)
+                        self.summon(summon_monster)
+                        battle_disp(self.name + '召喚了' + summon_monster.name)
+                        #battle_disp(self.name + 'が' + summon_monster.name + 'を召喚した')
+                        t1.append(summon_monster)
                 elif dmg < 0:
                     dmg = random.randint(dmg_max, dmg_min)
                     battle_disp(self.name + '使用' + s.name + '，給' + orb.name + '恢復了' + str(-dmg) + '點生命力')
+                    # battle_disp(self.name + 'が' + s.name + 'を使った' + '、' + orb.name + 'のHPを' + str(dmg) + '回復した')
                 elif s.name == '驅散':
+                # elif s.name == '解除':
                     for i in range(len(orb.debuff) - 1, -1, -1):
                         d = orb.debuff[i]
                         if d.last == inf:
@@ -435,6 +450,19 @@ dominion.skill.append(s)
 dominion.skill.append(YuiSkill('治療', -15, cd=1, target='friend'))
 dominion.skill.append(YuiSkill('劈砍'))
 
+ligeia = YuiAgent('莉姬亞', hp=100, atk=20, df=12)
+s = YuiSkill('專注', target='self', dmg=0, cd=5)
+s.debuff = YuiBuff('專注', '暴擊', 30, last=3)
+s.cost = 0
+ligeia.skill.append(s)
+s = YuiSkill('隱身', target='self', dmg=0, cd=4)
+s.debuff = YuiBuff('隱身', '迴避', last=2)
+s.cost = 0
+ligeia.skill.append(s)
+s = YuiSkill('背刺', dmg=15)
+s.debuff = YuiDebuff('中毒', '傷害', 5, last=3)
+ligeia.skill.append(s)
+
 # boss
 
 sirius = YuiAgent('西里烏斯', hp=1200, atk=18, df=15)
@@ -449,7 +477,7 @@ sirius.skill.append(s)
 sirius.skill.append(YuiSkill('鐳射掃描', dmg=30, cd=1, r=2))
 sirius.skill.append(YuiSkill('治療', -20, target='friend'))
 
-bouya = YuiAgent('少爺', hp=800, atk=20, df=15)
+bouya = YuiAgent('少爺', hp=900, atk=20, df=15)
 bouya.critical = 50
 
 s = YuiSkill('無限劍製', dmg=40, cd=inf, r=3)
@@ -461,7 +489,7 @@ s.debuff = YuiBuff('隱身', '迴避', last=2)
 s.cost = 0
 bouya.skill.append(s)
 
-shadow = YuiAgent('影分身', hp=1, atk=20, df=15)
+shadow = YuiAgent('影分身', hp=1, atk=17, df=15)
 shadow.critical = 50
 s = YuiSkill('隱身', target='self', dmg=0, cd=4)
 s.debuff = YuiBuff('隱身', '迴避', last=2)
@@ -478,10 +506,12 @@ kaeda.skill.append(YuiSummon('設置炸彈', summon=bomb))
 kaeda.dead.append(YuiSkill('核地雷自爆', dmg=30, cd=inf, r=3))
 
 adeak = YuiAgent('阿蒂雅', hp=600, atk=15, df=15)
-adeak.skill.append(YuiSkill('投擲手雷', dmg=20))
+adeak.skill.append(YuiSkill('集束炸彈', dmg=10))
 adeak.dead.append(YuiSkill('核地雷自爆', dmg=30, cd=inf, r=3))
+mini_bomb = YuiAgent('子炸彈', hp=1, atk=15, df=15)
+mini_bomb.dead.append(YuiSkill('爆炸', dmg=15))
 
-andreas = YuiAgent('安朵蕾雅絲', hp=1000, atk=20, df=15)
+andreas = YuiAgent('安朵蕾雅絲', hp=1200, atk=20, df=15)
 s = YuiSkill('鑽地', target='self', dmg=0, cd=4)
 s.debuff = YuiBuff('鑽地', '迴避', last=2)
 s.cost = 0
@@ -497,9 +527,9 @@ andreas.skill.append(YuiSkill('重踢'))
 
 hammett = YuiAgent('哈密特', hp=1200, atk=18, df=15)
 hammett.resist.append('侵蝕')
-s = YuiSkill('六氟銻酸雨', dmg=30, cd=inf, r=3)
+s = YuiSkill('六氟銻酸雨', dmg=40, cd=inf, r=3)
 s.cond = 50
-s.debuff = YuiDebuff('侵蝕', '防禦力', 2, last=inf)
+s.debuff = YuiDebuff('侵蝕', '防禦力', 5, last=inf)
 hammett.skill.append(s)
 s = YuiSkill('強氧化劑', dmg=20, cd=3, r=2)
 s.debuff = YuiDebuff('燃燒', '傷害', 5, last=3)
@@ -510,9 +540,9 @@ hammett.skill.append(YuiSkill('坩堝鉗'))
 
 covid = YuiAgent('克維德', hp=1200, atk=20, df=15)
 covid.resist.append('中毒')
-s = YuiSkill('毒氣', dmg=0, cd=inf, r=3)
+s = YuiSkill('VX神經毒氣', dmg=0, cd=inf, r=3)
 s.cond = 50
-s.debuff = YuiDebuff('中毒', '傷害', 10, last=inf)
+s.debuff = YuiDebuff('中毒', '傷害', 18, last=inf)
 covid.skill.append(s)
 s = YuiSkill('多重毒箭', cd=1, r=2)
 s.debuff = YuiDebuff('中毒', '傷害', 10, last=3)
@@ -531,7 +561,7 @@ s.is_env = True
 s.cond = 50
 tambora.skill.append(s)
 tambora.skill.append(YuiSkill('火炎噴射', dmg=12, cd=2, r=2))
-tambora.skill.append(YuiSkill('撕咬'))
+tambora.skill.append(YuiSkill('劈砍'))
 s = YuiSkill('血怒', target='self', dmg=0)
 s.debuff = YuiBuff('血怒', '攻擊力', 1, last=3)
 tambora.passive.append(s)
@@ -551,7 +581,7 @@ window.geometry('1000x600')
 
 all_hero = {'貝羅斯': belos, '塞萊茜布': celexib, '蕾吉娜': regina, '喬恩': donnet, '艾莉安': elion,
             '薇莉安娜': willianna, '琉塔': lyuda, '哈拉爾德': harald, '瑪格麗特': magret, '歐若拉': eurora,
-            '多米妮安': dominion,
+            '多米妮安': dominion, '莉姬亞': ligeia,
             '西里烏斯': sirius, '少爺': bouya, '卡伊達': kaeda, '阿蒂雅': adeak, '安朵蕾雅絲': andreas,
             '哈密特': hammett, '克維德': covid, '坦博拉': tambora}
 
@@ -686,6 +716,7 @@ images = {
     "瑪格麗特": load_image(yui_dir + "瑪格麗特.png"),
     "歐若拉": load_image(yui_dir + "歐若拉.png"),
     "多米妮安": load_image(yui_dir + "多米妮安.png"),
+    "莉姬亞": load_image(yui_dir + "莉姬亞.png"),
     "西里烏斯": load_image(yui_dir + "西里烏斯.png"),
     "少爺": load_image(yui_dir + "少爺.png"),
     "卡伊達": load_image(yui_dir + "卡伊達.png"),
@@ -765,6 +796,7 @@ menu.add_command(label="哈拉爾德（戰士，治療/坦克）", command=lambd
 menu.add_command(label="瑪格麗特（弓箭手，治療/傷害輸出）", command=lambda: hero('瑪格麗特', 0))
 menu.add_command(label="歐若拉（聖騎士，治療/輔助）", command=lambda: hero('歐若拉', 0))
 menu.add_command(label="多米妮安（牧師，治療/輔助）", command=lambda: hero('多米妮安', 0))
+menu.add_command(label="莉姬亞（刺客，傷害輸出）", command=lambda: hero('莉姬亞', 0))
 
 
 def show_menu(event=None):
@@ -786,6 +818,7 @@ menu2.add_command(label="哈拉爾德（戰士，治療/坦克）", command=lamb
 menu2.add_command(label="瑪格麗特（弓箭手，治療/傷害輸出）", command=lambda: hero('瑪格麗特', 1))
 menu2.add_command(label="歐若拉（聖騎士，治療/輔助）", command=lambda: hero('歐若拉', 1))
 menu2.add_command(label="多米妮安（牧師，治療/輔助）", command=lambda: hero('多米妮安', 1))
+menu2.add_command(label="莉姬亞（刺客，傷害輸出）", command=lambda: hero('莉姬亞', 1))
 
 
 def show_menu2(event=None):
@@ -807,6 +840,7 @@ menu3.add_command(label="哈拉爾德（戰士，治療/坦克）", command=lamb
 menu3.add_command(label="瑪格麗特（弓箭手，治療/傷害輸出）", command=lambda: hero('瑪格麗特', 2))
 menu3.add_command(label="歐若拉（聖騎士，治療/輔助）", command=lambda: hero('歐若拉', 2))
 menu3.add_command(label="多米妮安（牧師，治療/輔助）", command=lambda: hero('多米妮安', 2))
+menu3.add_command(label="莉姬亞（刺客，傷害輸出）", command=lambda: hero('莉姬亞', 2))
 
 
 def show_menu3(event=None):
@@ -828,6 +862,7 @@ menu4.add_command(label="哈拉爾德（戰士，治療/坦克）", command=lamb
 menu4.add_command(label="瑪格麗特（弓箭手，治療/傷害輸出）", command=lambda: hero('瑪格麗特', 3))
 menu4.add_command(label="歐若拉（聖騎士，治療/輔助）", command=lambda: hero('歐若拉', 3))
 menu4.add_command(label="多米妮安（牧師，治療/輔助）", command=lambda: hero('多米妮安', 3))
+menu4.add_command(label="莉姬亞（刺客，傷害輸出）", command=lambda: hero('莉姬亞', 3))
 
 
 def show_menu4(event=None):
@@ -849,6 +884,7 @@ menu5.add_command(label="哈拉爾德（戰士，治療/坦克）", command=lamb
 menu5.add_command(label="瑪格麗特（弓箭手，治療/傷害輸出）", command=lambda: hero('瑪格麗特', 4))
 menu5.add_command(label="歐若拉（聖騎士，治療/輔助）", command=lambda: hero('歐若拉', 4))
 menu5.add_command(label="多米妮安（牧師，治療/輔助）", command=lambda: hero('多米妮安', 4))
+menu5.add_command(label="莉姬亞（刺客，傷害輸出）", command=lambda: hero('莉姬亞', 4))
 
 
 def show_menu5(event=None):
@@ -883,11 +919,12 @@ button6.bind("<Button-1>", show_menu6)
 
 lock = threading.Lock()
 
-cd_var = tk.IntVar(value=1)
-cd = 0.5
+cd_var = tk.IntVar(value=2)
+cd = 1
 
-tk.Radiobutton(window, text="慢速遊戲", variable=cd_var, value=1).place(x=810, y=200)
-tk.Radiobutton(window, text="快速遊戲", variable=cd_var, value=0).place(x=810, y=230)
+tk.Radiobutton(window, text="慢速遊戲", variable=cd_var, value=2).place(x=810, y=200)
+tk.Radiobutton(window, text="快速遊戲", variable=cd_var, value=1).place(x=810, y=230)
+tk.Radiobutton(window, text="極速遊戲", variable=cd_var, value=0).place(x=810, y=260)
 
 
 def battle_disp(v):
@@ -919,9 +956,16 @@ class YuiStart(threading.Thread):
         all = t1_tmp + t2_tmp
         add_summon(t1_tmp)
         add_summon(t2_tmp)
+        #for a in t1_tmp + t2_tmp:
+         #   a.hp = int(a.hp * 10)
+         #   a.hp_now = int(a.hp_now * 10)
         count = 1
         stop = False
         while 1:
+            if count == 21:
+                count = 20
+                battle_disp('戰鬥超時，挑戰失敗')
+                break
             battle_disp('')
             battle_disp('第' + str(count) + '回合')
             battle_disp('')
@@ -1026,10 +1070,7 @@ def start_battle():
                 battle_disp('系統消息：請選擇要挑戰的BOSS')
                 battle_disp('')
             else:
-                if cd_var.get() == 1:
-                    cd = 0.5
-                else:
-                    cd = 0
+                cd = cd_var.get()/2
                 yui_discourse.delete("1.0", tk.END)
                 yui_start = YuiStart()
                 ongoing.append(yui_start)
