@@ -6,15 +6,21 @@ import random
 import time
 from decimal import *
 
-yui_dir = 'D:/game_data/'
+yui_dir = 'game_data/'
 
 
 def target_chose(team, mode='min'):
+    hp = []
     hp_rate = []
+    hate = []
     for o in team:
+        hp.append(o.hp)
         hp_rate.append(o.hp_now / o.hp)
+        hate.append(o.hate)
     if mode == 'max':
-        return hp_rate.index(max(hp_rate))
+        return hp.index(max(hp))
+    elif mode == 'hate':
+        return hate.index(max(hate))
     else:
         return hp_rate.index(min(hp_rate))
 
@@ -34,22 +40,22 @@ class YuiAgent:
         self.dead = []
         self.dps = 0
         self.heal = 0
-        self.hate = 1
+        self.hate = 0
         self.buff = []
         self.debuff = []
         self.summon_monster = []
         self.master = None
         self.env = None
         self.evade = False
-        self.energy = 1
         self.resist = []
+        self.orb = None
+        self.team = 1
 
     def summon(self, s):
         self.summon_monster.append(s)
         s.master = self
 
     def use_skill(self, skill, t1, t2):
-        en = self.energy
         for s in skill:
             if s.cd_now > 0:
                 s.cd_now -= 1
@@ -59,17 +65,33 @@ class YuiAgent:
                 continue
 
             if isinstance(s, YuiSummon):
+                if s.name == '下咒':
+                    t_chose = [x for x in t2 if x.hp_now > 0]
+                    if t_chose:
+                        summon_monster = copy.deepcopy(s.summon)
+                        self.summon(summon_monster)
+                        i = target_chose(t_chose, 'max')
+                        orb = t_chose[i]
+                        summon_monster.orb = orb
+                        battle_disp(self.name + '召喚了詛咒' + orb.name + '的詛咒人偶', self.team)
+                        t2.append(summon_monster)
+                        s.cd_now = s.cd
+                    continue
+
                 for _ in range(s.num):
                     summon_monster = copy.deepcopy(s.summon)
                     self.summon(summon_monster)
-                    battle_disp(self.name + '召喚了' + summon_monster.name)
-                    #battle_disp(self.name + 'が' + summon_monster.name + 'を召喚した')
+                    battle_disp(self.name + '召喚了' + summon_monster.name, self.team)
+                    #battle_disp(self.name + 'が' + summon_monster.name + 'を召喚した', self.team)
                     if s.is_env:
                         self.env = summon_monster
                     else:
                         t1.append(summon_monster)
+                    if summon_monster.name == '骨龍':
+                        icons2[3].config(image=images['骨龍'])
+                        names2[3].config(text='骨龍\nHP:' + str(summon_monster.hp_now) + '/' + str(summon_monster.hp))
                     s.cd_now = s.cd
-                break
+                continue
 
             orbs = []
             if s.target == 'self':  # 對自己使用
@@ -77,34 +99,33 @@ class YuiAgent:
                 ind = [0]
             elif s.target == 'friend':  # 對友軍使用
                 if s.range == 3:  # 全體技能
-                    orbs = [x for x in t1 if x.hp_now > 0]
+                    orbs = [x for x in t1 if x.hp_now > 0 and x.name != '詛咒人偶']
                     ind = list(range(len(orbs)))
                 else:
-                    t_chose = [x for x in t1 if x.hp_now > 0]
+                    t_chose = [x for x in t1 if x.hp_now > 0 and x.name != '詛咒人偶']
                     ind = list(range(len(t_chose)))
+            elif s.name == '傷害轉移':
+                orbs = [self.orb]
+                ind = [0]
             else:
                 if s.range == 3:  # 全體技能
                     orbs = [x for x in t2 if x.hp_now > 0]
                     ind = list(range(len(orbs)))
                 else:
                     t_chose = [x for x in t2 if x.hp_now > 0]
-                    ind = []
-                    for i, orb in enumerate(t_chose):
-                        ind.extend([i] * orb.hate)
+                    ind = list(range(len(t_chose)))
 
             if not ind:
                 continue
 
-            if orbs or s.range == 3:  # 自身技能，全體技能
+            if orbs or s.range == 3:  # 自身技能，全體技能，詛咒
                 pass
             elif s.range == 2:  # 範圍攻擊
                 if s.dmg < 0:  # 治療
                     i = target_chose(t_chose, 'min')
                 else:
-                    i = random.choice(ind)
+                    i = target_chose(t_chose, 'hate')
                 orbs.append(t_chose[i])
-                ind = list(set(ind))
-                random.shuffle(ind)
                 ind.remove(i)
                 for i in ind[:2]:
                     orbs.append(t_chose[i])
@@ -113,22 +134,23 @@ class YuiAgent:
                 #if s.dmg < 0 or self.name == 'リューダ':
                     i = target_chose(t_chose, 'min')
                 else:
-                    i = random.choice(ind)
+                    i = target_chose(t_chose, 'hate')
                 orbs.append(t_chose[i])
 
-            if s.dmg == 0:
-                battle_disp(self.name + '使用' + s.name)
-                #battle_disp(self.name + 'が' + s.name + 'を使った')
+            if s.dmg == 0 and s.name != '血怒':
+            #if s.dmg == 0 and s.name != '血迷い':
+                battle_disp(self.name + '使用' + s.name, self.team)
+                #battle_disp(self.name + 'が' + s.name + 'を使った', self.team)
             for orb in orbs:
-                if orb.evade:
+                if orb.evade and s.name != '死亡宣告':
                     continue
 
                 s.cd_now = s.cd  # 技能開始冷卻
                 if orb != self:
                     miss = random.randint(0, 100)
                     if miss > self.no_miss:
-                        battle_disp(self.name + '使用' + s.name + '，但沒有命中' + orb.name)
-                        #battle_disp(self.name + 'が' + s.name + 'を使った' + '、しかし' + orb.name + 'に当たらなかった')
+                        battle_disp(self.name + '使用' + s.name + '，但沒有命中' + orb.name, self.team)
+                        #battle_disp(self.name + 'が' + s.name + 'を使った' + '、しかし' + orb.name + 'に当たらなかった', self.team)
                         continue
                 if s.dmg > 0:
                     dmg = max(1, s.dmg + self.atk - orb.df)
@@ -145,33 +167,38 @@ class YuiAgent:
                         c = '暴擊'
                         #c = '会心'
                         dmg = round(dmg * 1.5)
-                    battle_disp(self.name + '使用' + s.name + '，給' + orb.name + '造成了' + str(dmg) + '點' + c + '傷害')
-                    #battle_disp(self.name + 'が' + s.name + 'を使った' + '、' + orb.name + 'に'+ str(dmg) + 'の' + c + 'ダメージを与えた')
+                    battle_disp(self.name + '使用' + s.name + '，給' + orb.name + '造成了' + str(dmg) + '點' + c + '傷害', self.team)
+                    #battle_disp(self.name + 'が' + s.name + 'を使って' + '、' + orb.name + 'に'+ str(dmg) + 'の' + c + 'ダメージを与えた', self.team)
                     orb.use_skill(orb.passive, t2, t1)
                     if orb.name == '黃泉引路人':
-                        curse = max(1, int(dmg * 0.3))
-                        battle_disp(self.name + '受到詛咒，受到了' + str(curse) + '點傷害')
+                        if orb.hp_now / orb.hp > 0.5:
+                            curse = max(1, int(dmg * 0.2))
+                        else:
+                            curse = max(1, int(dmg * 0.4))
+                        battle_disp(self.name + '受到詛咒，受到了' + str(curse) + '點傷害', self.team)
+                        #battle_disp(self.name + 'は呪いにかけられて' + str(curse) + 'のダメージを受けた', self.team)
                         self.hp_now -= curse
                         if self.hp_now < 0:
                             curse += self.hp_now
                             self.hp_now = 0
                         orb.dps += curse
-                        update_hp_text(self)
+                        update_hp_text(self, team)
                         if self.hp_now == 0:
                             self.use_skill(orb.dead, t2, t1)
-                            battle_disp(self.name + '死掉了')
+                            battle_disp(self.name + '死掉了', self.team)
+                            #battle_disp(self.name + 'が戦闘不能', self.team)
                     if s.name == '集束炸彈':
                         summon_monster = copy.deepcopy(mini_bomb)
                         self.summon(summon_monster)
-                        battle_disp(self.name + '召喚了' + summon_monster.name)
-                        #battle_disp(self.name + 'が' + summon_monster.name + 'を召喚した')
+                        battle_disp(self.name + '召喚了' + summon_monster.name, self.team)
+                        #battle_disp(self.name + 'が' + summon_monster.name + 'を召喚した', self.team)
                         t1.append(summon_monster)
                 elif dmg < 0:
                     dmg = random.randint(dmg_max, dmg_min)
-                    battle_disp(self.name + '使用' + s.name + '，給' + orb.name + '恢復了' + str(-dmg) + '點生命力')
-                    # battle_disp(self.name + 'が' + s.name + 'を使った' + '、' + orb.name + 'のHPを' + str(dmg) + '回復した')
+                    battle_disp(self.name + '使用' + s.name + '，給' + orb.name + '恢復了' + str(-dmg) + '點生命力', self.team)
+                    #battle_disp(self.name + 'が' + s.name + 'を使って' + '、' + orb.name + 'のHPを' + str(-dmg) + '回復した', self.team)
                 elif s.name == '驅散':
-                # elif s.name == '解除':
+                #elif s.name == '祓い':
                     for i in range(len(orb.debuff) - 1, -1, -1):
                         d = orb.debuff[i]
                         if d.last == inf or d.name == '死亡宣告':
@@ -183,12 +210,14 @@ class YuiAgent:
                 d1 = s.debuff  # 異常狀態
                 if d1:
                     if d1.name in orb.resist:
-                        battle_disp(orb.name + '抵抗了' + d1.name)
+                        battle_disp(orb.name + '抵抗了' + d1.name, orb.team)
+                        #battle_disp(orb.name + 'が' + d1.name + 'を抵抗した', orb.team)
                     elif d1.attr == '防禦力' and d1.dmg >= orb.df:
-                        battle_disp('無法繼續降低防禦力')
+                        battle_disp('無法繼續降低防禦力', self.team)
+                        #battle_disp('これ以上防御力を下げることは出来ない', self.team)
                     else:
                         check = True
-                        if d1.name not in ['中毒', '血怒', '侵蝕']:
+                        if d1.name not in ['中毒', '血怒', '侵蝕', '血迷い']:
                             for d2 in orb.debuff:
                                 if d1.name == d2.name:
                                     check = False
@@ -223,16 +252,14 @@ class YuiAgent:
 
                 if orb.hp_now == 0:
                     orb.use_skill(orb.dead, t2, t1)
-                    battle_disp(orb.name + '死掉了')
-            en -= s.cost
-            if en == 0:
-                break
+                    battle_disp(orb.name + '死掉了', orb.team)
+                    #battle_disp(orb.name + 'が戦闘不能', orb.team)
 
     def act(self, t1, t2):
         speed_cost = 0
         for d in self.debuff:
-            if d.name == '恐懼':
-                battle_disp(self.name + '受到' + d.name + '的影響，無法行動')
+            if d.name in ['恐懼', '靜止']:
+                battle_disp(self.name + '受到' + d.name + '的影響，無法行動', self.team)
                 speed_cost += inf
                 break
         while 100 <= self.speed - speed_cost:
@@ -244,6 +271,21 @@ class YuiAgent:
         if self in t1:
             for i in range(len(self.buff) - 1, -1, -1):
                 d = self.buff[i]
+                if d.attr == '回復':
+                    dmg = d.dmg
+                    dmg_max = round(dmg * 1.2)
+                    dmg_min = round(dmg * 0.8)
+                    dmg = random.randint(dmg_min, dmg_max)
+                    battle_disp(self.name + '受到' + d.name + '的影響，回復了' + str(dmg) + '點生命力', self.team)
+                    self.hp_now += dmg
+                    if self.hp_now > self.hp:
+                        dmg = dmg - self.hp_now + self.hp
+                        self.hp_now = self.hp
+                    update_hp_text(self, team)
+
+                    source = d.source
+                    source.heal += dmg
+
                 d.last -= 1
                 if d.last == 0:
                     d.offset(self)
@@ -263,8 +305,7 @@ class YuiAgent:
                     dmg_max = round(dmg * 1.2)
                     dmg_min = round(dmg * 0.8)
                     dmg = random.randint(dmg_min, dmg_max)
-                    battle_disp(self.name + '受到' + str(dmg) + '點' + d.name + '傷害')
-                    self.use_skill(self.passive, t1, t2)
+                    battle_disp(self.name + '受到' + str(dmg) + '點' + d.name + '傷害', self.team)
                     self.hp_now -= dmg
                     if self.hp_now < 0:
                         dmg += self.hp_now
@@ -279,7 +320,7 @@ class YuiAgent:
 
                     if self.hp_now == 0:
                         self.use_skill(self.dead, t1, t2)
-                        battle_disp(self.name + '死掉了')
+                        battle_disp(self.name + '死掉了', self.team)
                         break
 
                 d.last -= 1
@@ -287,8 +328,8 @@ class YuiAgent:
                     d.offset(self)
                     del self.debuff[i]
                     if d.name == '死亡宣告':
-                        battle_disp(self.name + '受到死亡宣告的影響，受到了9999點傷害')
-                        battle_disp(self.name + '死掉了')
+                        battle_disp(self.name + '受到死亡宣告的影響，受到了9999點傷害', self.team)
+                        battle_disp(self.name + '死掉了', self.team)
                         for a in t1 + t2:
                             if a.name == '黃泉引路人':
                                 a.dps += self.hp_now
@@ -309,7 +350,6 @@ class YuiSkill:
         self.range = r
         self.debuff = None
         self.cond = 100
-        self.cost = 1
 
 
 class YuiSummon(YuiSkill):
@@ -330,11 +370,14 @@ class YuiBuff:
         self.last = last
 
     def onset(self, orb):
-        battle_disp(orb.name + '進入了' + self.name + '狀態')
+        battle_disp(orb.name + '進入了' + self.name + '狀態', orb.team)
+        #battle_disp(orb.name + 'が' + self.name + '状態に入った', orb.team)
         if self.attr == '仇恨':
             orb.hate += self.dmg
         elif self.attr == '攻擊力':
             orb.atk += self.dmg
+        elif self.attr == '防禦力':
+            orb.df += self.dmg
         elif self.attr == '速度':
             orb.speed += self.dmg
         elif self.attr == '暴擊':
@@ -343,11 +386,14 @@ class YuiBuff:
             orb.evade = True
 
     def offset(self, orb):
-        battle_disp(orb.name + '解除' + self.name + '狀態')
+        battle_disp(orb.name + '解除' + self.name + '狀態', orb.team)
+        #battle_disp(orb.name + 'の' + self.name + '状態が解除された', orb.team)
         if self.attr == '仇恨':
             orb.hate -= self.dmg
         elif self.attr == '攻擊力':
             orb.atk -= self.dmg
+        elif self.attr == '防禦力':
+            orb.df -= self.dmg
         elif self.attr == '速度':
             orb.speed -= self.dmg
         elif self.attr == '暴擊':
@@ -366,116 +412,173 @@ class YuiDebuff:
         self.source = None
 
     def onset(self, orb):
-        battle_disp(orb.name + '陷入了' + self.name + '狀態')
+        battle_disp(orb.name + '陷入了' + self.name + '狀態', orb.team)
+        #battle_disp(orb.name + 'が' + self.name + '状態に陥た', orb.team)
         if self.attr == '命中':
             orb.no_miss -= self.dmg
         elif self.attr == '防禦力':
             orb.df -= self.dmg
         elif self.attr == '暴擊':
             orb.critical -= self.dmg
+        elif self.attr == '速度':
+            orb.speed -= self.dmg
 
     def offset(self, orb):
         if self.name != '死亡宣告':
-            battle_disp(orb.name + '從' + self.name + '狀態中恢復')
+            battle_disp(orb.name + '從' + self.name + '狀態中恢復', orb.team)
+            #battle_disp(orb.name + 'が' + self.name + '状態から回復した', orb.team)
         if self.attr == '命中':
             orb.no_miss += self.dmg
         elif self.attr == '防禦力':
             orb.df += self.dmg
         elif self.attr == '暴擊':
             orb.critical += self.dmg
+        elif self.attr == '速度':
+            orb.speed += self.dmg
 
 
 inf = Decimal('inf')
 
 belos = YuiAgent('貝羅斯', hp=120, atk=20, df=20)
 s = YuiSkill('挑釁', target='self', dmg=0, cd=4)
-s.debuff = YuiBuff('挑釁', '仇恨', 2, last=2)
-s.cost = 0
+s.debuff = YuiBuff('挑釁', '仇恨', 1, last=2)
 belos.skill.append(s)
 belos.skill.append(YuiSkill('球狀閃電', dmg=20, cd=2, r=2))
 belos.skill.append(YuiSkill('錘擊'))
+'''
+belos = YuiAgent('ベロス', hp=120, atk=20, df=20)
+s = YuiSkill('挑発', target='self', dmg=0, cd=4)
+s.debuff = YuiBuff('挑発', '仇恨', 1, last=2)
+belos.skill.append(s)
+belos.skill.append(YuiSkill('球電', dmg=20, cd=2, r=2))
+belos.skill.append(YuiSkill('ハンマー撃ち'))
+'''
 
 celexib = YuiAgent('塞萊茜布', hp=90, atk=15, df=15)
-celexib.skill.append(YuiSkill('群體治療', -15, target='friend', r=2, cd=2))
+celexib.skill.append(YuiSkill('群體治療', -10, target='friend', r=2, cd=2))
 celexib.skill.append(YuiSkill('寒冰飛彈', dmg=20, cd=2))
 celexib.skill.append(YuiSkill('治療', -15, target='friend'))
+'''
+celexib = YuiAgent('セレクシーブ', hp=90, atk=15, df=15)
+celexib.skill.append(YuiSkill('拡散治療', -10, target='friend', r=2, cd=2))
+celexib.skill.append(YuiSkill('冷凍ミサイル', dmg=20, cd=2))
+celexib.skill.append(YuiSkill('治療', -15, target='friend'))
+'''
 
 regina = YuiAgent('蕾吉娜', hp=110, atk=20, df=15)
 s = YuiSkill('狂化', target='self', dmg=0, cd=5)
 s.debuff = YuiBuff('狂化', '攻擊力', 10, last=3)
-s.cost = 0
 regina.skill.append(s)
-regina.skill.append(YuiSkill('獅吼功', dmg=20, cd=2, r=2))
+regina.skill.append(YuiSkill('獅吼功', dmg=15, cd=2, r=2))
 regina.skill.append(s)
 regina.skill.append(YuiSkill('劈砍'))
 s = YuiSkill('血怒', target='self', dmg=0)
-s.debuff = YuiBuff('血怒', '攻擊力', 5, last=3)
+s.debuff = YuiBuff('血怒', '攻擊力', 1, last=3)
 regina.passive.append(s)
+'''
+regina = YuiAgent('レジーナ', hp=110, atk=20, df=15)
+s = YuiSkill('狂化', target='self', dmg=0, cd=5)
+s.debuff = YuiBuff('狂化', '攻擊力', 10, last=3)
+regina.skill.append(s)
+regina.skill.append(YuiSkill('咆哮', dmg=15, cd=2, r=2))
+regina.skill.append(s)
+regina.skill.append(YuiSkill('斬り'))
+s = YuiSkill('血迷い', target='self', dmg=0)
+s.debuff = YuiBuff('血迷い', '攻擊力', 2, last=3)
+regina.passive.append(s)
+'''
 
 donnet = YuiAgent('喬恩', hp=100, atk=12, df=12)
-drone = YuiAgent('無人機', hp=1, atk=12, df=15)
+drone = YuiAgent('無人機', hp=1, atk=20, df=15)
 drone.resist.append('中毒')
 drone.skill.append(YuiSkill('機槍掃射'))
 donnet.skill.append(YuiSummon('召喚無人機', cd=2, summon=drone))
 donnet.skill.append(YuiSkill('重踢'))
 elion = YuiAgent('艾莉安', hp=110, atk=20, df=15)
+elion.hate = -1
 elion.skill.append(YuiSkill('砲擊'))
 elion.resist.append('中毒')
 donnet.summon(elion)
+'''
+donnet = YuiAgent('ジョン', hp=100, atk=12, df=12)
+drone = YuiAgent('ドローン', hp=1, atk=20, df=15)
+drone.resist.append('中毒')
+drone.skill.append(YuiSkill('銃撃'))
+donnet.skill.append(YuiSummon('ドローン召喚', cd=2, summon=drone))
+donnet.skill.append(YuiSkill('蹴り'))
+elion = YuiAgent('エリオン', hp=110, atk=20, df=15)
+elion.hate = -1
+elion.skill.append(YuiSkill('砲撃'))
+elion.resist.append('中毒')
+donnet.summon(elion)
+'''
 
 willianna = YuiAgent('薇莉安娜', hp=100, atk=20, df=12)
 s = YuiSkill('速射', target='self', dmg=0, cd=5)
 s.debuff = YuiBuff('速射', '速度', 50, last=3)
-s.cost = 0
 willianna.skill.append(s)
-willianna.skill.append(YuiSkill('雲爆箭', dmg=20, cd=4, r=2))
-s = YuiSkill('汽油箭', dmg=20, cd=2)
+willianna.skill.append(YuiSkill('雲爆箭', dmg=15, cd=4, r=2))
+s = YuiSkill('汽油箭', dmg=15, cd=2)
 s.debuff = YuiDebuff('燃燒', '傷害', 5, last=3)
 willianna.skill.append(s)
 willianna.skill.append(YuiSkill('射擊'))
+'''
+willianna = YuiAgent('ウェリアナ', hp=100, atk=20, df=12)
+'''
 
 lyuda = YuiAgent('琉塔', hp=100, atk=20, df=12)
 s = YuiSkill('瞄準', target='self', dmg=0, cd=5)
 s.debuff = YuiBuff('瞄準', '暴擊', 30, last=3)
-s.cost = 0
 lyuda.skill.append(s)
 s = YuiSkill('穿甲彈', dmg=20, cd=3)
 s.debuff = YuiDebuff('破防', '防禦力', 2, last=3)
 lyuda.skill.append(s)
 lyuda.skill.append(YuiSkill('狙擊', dmg=20))
 
-eurora = YuiAgent('歐若拉', hp=100, atk=15, df=15)
-s = YuiSkill('鼓舞', dmg=0, cd=4, r=3, target='friend')
-s.debuff = YuiBuff('鼓舞', '攻擊力', 5, 2)
-eurora.skill.append(s)
-eurora.skill.append(YuiSkill('治療', -20, target='friend', cd=1))
-s = YuiSkill('杖擊')
-s.cost = 0
-eurora.skill.append(s)
-eurora.skill.append(YuiSkill('重踢'))
-
-harald = YuiAgent('哈拉爾德', hp=120, atk=15, df=20)
+harald = YuiAgent('哈拉爾德', hp=120, atk=15, df=18)
 s = YuiSkill('挑釁', target='self', dmg=0, cd=4)
-s.debuff = YuiBuff('挑釁', '仇恨', 2, last=2)
-s.cost = 0
+s.debuff = YuiBuff('挑釁', '仇恨', 1, last=2)
 harald.skill.append(s)
 harald.skill.append(YuiSkill('鐳射', dmg=20, cd=3))
 harald.skill.append(YuiSkill('治療', -15, cd=1, target='friend'))
 harald.skill.append(YuiSkill('棍擊'))
 
-magret = YuiAgent('瑪格麗特', hp=100, atk=20, df=12)
+margrete = YuiAgent('瑪格麗特', hp=100, atk=20, df=12)
 s = YuiSkill('強攻', target='self', dmg=0, cd=5)
 s.debuff = YuiBuff('強攻', '攻擊力', 10, last=3)
-s.cost = 0
-magret.skill.append(s)
-magret.skill.append(YuiSkill('鐳射', dmg=20, cd=3))
-magret.skill.append(YuiSkill('治療', -15, target='friend', cd=2))
-magret.skill.append(YuiSkill('射擊'))
+margrete.skill.append(s)
+margrete.skill.append(YuiSkill('鐳射', dmg=20, cd=3))
+margrete.skill.append(YuiSkill('治療', -15, target='friend', cd=2))
+margrete.skill.append(YuiSkill('射擊'))
+
+aurora = YuiAgent('歐若拉', hp=100, atk=15, df=15)
+s = YuiSkill('鼓舞', dmg=0, cd=4, r=3, target='friend')
+s.debuff = YuiBuff('鼓舞', '攻擊力', 5, 2)
+aurora.skill.append(s)
+aurora.skill.append(YuiSkill('治療', -20, target='friend'))
+s = YuiSkill('杖擊')
+aurora.skill.append(s)
+aurora.skill.append(YuiSkill('重踢', dmg=15))
+
+libuse = YuiAgent('莉布絲', hp=100, atk=15, df=12)
+doll = YuiAgent('詛咒人偶', hp=100, atk=20, df=12)
+doll.hate = -1
+doll.passive.append(YuiSkill('傷害轉移', dmg=20))
+libuse.skill.append(YuiSummon('下咒', cd=3, summon=doll))
+libuse.skill.append(YuiSkill('靈魂爆破', dmg=20, cd=2, r=2))
+libuse.skill.append(YuiSkill('杖擊'))
+
+neferti = YuiAgent('奈菲提', hp=100, atk=15, df=12)
+s = YuiSkill('戰壕挖掘', dmg=0, cd=4, r=3, target='friend')
+s.debuff = YuiBuff('掩護', '防禦力', 4, 2)
+neferti.skill.append(s)
+neferti.skill.append(YuiSkill('拋石車', dmg=20, cd=2, r=2))
+neferti.skill.append(YuiSkill('墜石', dmg=15, cd=1))
+neferti.skill.append(YuiSkill('彈弓射擊'))
 
 elijah = YuiAgent('伊利亞', hp=100, atk=15, df=12)
 s = YuiSkill('麻醉', dmg=0, cd=3, r=3)
 s.debuff = YuiDebuff('走神', '暴擊', 30, 2)
-s.cost = 0
 elijah.skill.append(s)
 s = YuiSkill('強氧化劑', dmg=20, cd=3, r=2)
 s.debuff = YuiDebuff('燃燒', '傷害', 5, last=3)
@@ -483,29 +586,27 @@ elijah.skill.append(s)
 elijah.skill.append(YuiSkill('重鉻酸洗液', dmg=20, cd=1, r=2))
 elijah.skill.append(YuiSkill('杖擊'))
 
-dominion = YuiAgent('多米妮安', hp=90, atk=20, df=15)
+dominion = YuiAgent('多米妮安', hp=100, atk=20, df=15)
 s = YuiSkill('驅散', dmg=0, target='friend', r=2, cd=2)
-s.cost = 0
 dominion.skill.append(s)
-dominion.skill.append(YuiSkill('治療', -20, cd=1, target='friend'))
+dominion.skill.append(YuiSkill('治療', -20, target='friend'))
 dominion.skill.append(YuiSkill('劈砍'))
 
 ligeia = YuiAgent('莉姬亞', hp=100, atk=20, df=12)
 s = YuiSkill('專注', target='self', dmg=0, cd=5)
 s.debuff = YuiBuff('專注', '暴擊', 30, last=3)
-s.cost = 0
 ligeia.skill.append(s)
 s = YuiSkill('隱身', target='self', dmg=0, cd=4)
 s.debuff = YuiBuff('隱身', '迴避', last=2)
-s.cost = 0
 ligeia.skill.append(s)
-s = YuiSkill('背刺', dmg=15)
+s = YuiSkill('毒刃背刺', dmg=20, cd=1)
 s.debuff = YuiDebuff('中毒', '傷害', 5, last=3)
 ligeia.skill.append(s)
+ligeia.skill.append(YuiSkill('捅刺', dmg=15))
 
 # boss
 
-sirius = YuiAgent('西里烏斯', hp=1200, atk=15, df=15)
+sirius = YuiAgent('西里烏斯', hp=1600, atk=16, df=15)
 sirius.resist.append('致盲')
 s = YuiSkill('氦閃衝擊', dmg=40, cd=inf, r=3)
 s.cond = 50
@@ -513,58 +614,65 @@ s.debuff = YuiDebuff('致盲', '命中', 30, 2)
 sirius.skill.append(s)
 s = YuiSkill('閃光彈', dmg=0, cd=4, r=3)
 s.debuff = YuiDebuff('致盲', '命中', 30, 2)
-s.cost = 0
 sirius.skill.append(s)
 sirius.skill.append(YuiSkill('鐳射掃描', dmg=30, cd=1, r=2))
-sirius.skill.append(YuiSkill('治療', -20, target='friend'))
+sirius.skill.append(YuiSkill('治療', -10, target='friend'))
+'''
+sirius = YuiAgent('シリウス', hp=1600, atk=15, df=15)
+sirius.resist.append('眩し')
+s = YuiSkill('氦閃衝擊', dmg=40, cd=inf, r=3)
+s.cond = 50
+s.debuff = YuiDebuff('眩し', '命中', 30, 2)
+sirius.skill.append(s)
+s = YuiSkill('閃光彈', dmg=0, cd=4, r=3)
+s.debuff = YuiDebuff('眩し', '命中', 30, 2)
+sirius.skill.append(s)
+sirius.skill.append(YuiSkill('鐳射掃描', dmg=30, cd=1, r=2))
+sirius.skill.append(YuiSkill('治療', -10, target='friend'))
+'''
 
-bouya = YuiAgent('少爺', hp=900, atk=20, df=15)
+bouya = YuiAgent('少爺', hp=1500, atk=20, df=15)
 bouya.critical = 50
 s = YuiSkill('無限劍製', dmg=40, cd=inf, r=3)
 s.cond = 50
 bouya.skill.append(s)
 s = YuiSkill('隱身', target='self', dmg=0, cd=4)
 s.debuff = YuiBuff('隱身', '迴避', last=2)
-s.cost = 0
 bouya.skill.append(s)
 shadow = YuiAgent('影分身', hp=1, atk=20, df=15)
 shadow.critical = 50
 s = YuiSkill('隱身', target='self', dmg=0, cd=4)
 s.debuff = YuiBuff('隱身', '迴避', last=2)
-s.cost = 0
 shadow.skill.append(s)
 shadow.skill.append(YuiSkill('劈砍'))
 bouya.skill.append(YuiSummon('影分身', cd=4, summon=shadow, num=4))
 bouya.skill.append(YuiSkill('劈砍'))
 
-kaeda = YuiAgent('卡伊達', hp=600, atk=15, df=15)
+kaeda = YuiAgent('卡伊達', hp=1000, atk=15, df=15)
 bomb = YuiAgent('炸彈', hp=1, atk=15, df=15)
 bomb.dead.append(YuiSkill('爆炸', dmg=15, r=2))
 kaeda.skill.append(YuiSummon('設置炸彈', summon=bomb))
 kaeda.dead.append(YuiSkill('核地雷自爆', dmg=30, cd=inf, r=3))
 
-adeak = YuiAgent('阿蒂雅', hp=600, atk=15, df=15)
-adeak.skill.append(YuiSkill('集束炸彈', dmg=10))
+adeak = YuiAgent('阿蒂雅', hp=1000, atk=15, df=15)
+adeak.skill.append(YuiSkill('集束炸彈', dmg=15))
 adeak.dead.append(YuiSkill('核地雷自爆', dmg=30, cd=inf, r=3))
 mini_bomb = YuiAgent('子炸彈', hp=1, atk=15, df=15)
 mini_bomb.dead.append(YuiSkill('爆炸', dmg=15))
 
-way_guider = YuiAgent('黃泉引路人', hp=1200, atk=20, df=15)
+way_guider = YuiAgent('黃泉引路人', hp=2000, atk=20, df=15)
 s = YuiSkill('死亡宣告', dmg=0, cd=inf, r=3)
-s.debuff = YuiDebuff('死亡宣告', last=12)
-s.cost = 0
+s.debuff = YuiDebuff('死亡宣告', last=14)
 way_guider.skill.append(s)
 s = YuiSkill('精神污染', dmg=0, cd=2)
 s.debuff = YuiDebuff('恐懼', last=1)
-s.cost = 0
 way_guider.skill.append(s)
 way_guider.skill.append(YuiSkill('靈魂爆破', dmg=20, cd=2, r=2))
 way_guider.skill.append(YuiSkill('匕首捅刺'))
 
-andreas = YuiAgent('安朵蕾雅絲', hp=1200, atk=20, df=15)
+andreas = YuiAgent('安朵蕾雅絲', hp=2000, atk=20, df=15)
 s = YuiSkill('鑽地', target='self', dmg=0, cd=4)
 s.debuff = YuiBuff('鑽地', '迴避', last=2)
-s.cost = 0
 andreas.skill.append(s)
 earthquake = YuiAgent('地震', hp=1, atk=15, df=0)
 earthquake.skill.append(YuiSkill('震動', r=3))
@@ -575,46 +683,80 @@ andreas.skill.append(s)
 andreas.skill.append(YuiSkill('拋石車', dmg=30, cd=2, r=2))
 andreas.skill.append(YuiSkill('重踢'))
 
-hammett = YuiAgent('哈密特', hp=1200, atk=18, df=15)
+greenwich = YuiAgent('船長格林威治', hp=2000, atk=20, df=15)
+s = YuiSkill('時間凍結', dmg=0, cd=inf, r=3)
+s.cond = 50
+s.debuff = YuiDebuff('靜止', last=1)
+greenwich.skill.append(s)
+s = YuiSkill('鐘慢效應', dmg=0, cd=3, r=2)
+s.debuff = YuiDebuff('靜止', last=1)
+greenwich.skill.append(s)
+greenwich.skill.append(YuiSkill('機槍掃射', dmg=25, cd=1, r=2))
+greenwich.skill.append(YuiSkill('鐵鉤'))
+
+hammett = YuiAgent('哈密特', hp=2000, atk=18, df=15)
 hammett.resist.append('侵蝕')
-s = YuiSkill('六氟銻酸雨', dmg=30, cd=inf, r=3)
+s = YuiSkill('六氟銻酸雨', dmg=20, cd=inf, r=3)
 s.cond = 50
 s.debuff = YuiDebuff('侵蝕', '防禦力', 2, last=inf)
 hammett.skill.append(s)
-s = YuiSkill('強氧化劑', dmg=20, cd=3, r=2)
+s = YuiSkill('強氧化劑', dmg=10, cd=3, r=2)
 s.debuff = YuiDebuff('燃燒', '傷害', 5, last=3)
 hammett.skill.append(s)
-s = YuiSkill('六氟銻酸', dmg=20, cd=1, r=2)
+s = YuiSkill('六氟銻酸', dmg=15, cd=1, r=2)
 s.debuff = YuiDebuff('侵蝕', '防禦力', 2, last=3)
 hammett.skill.append(s)
 hammett.skill.append(YuiSkill('坩堝鉗'))
 
-covid = YuiAgent('克維德', hp=1200, atk=20, df=15)
+covid = YuiAgent('克維德', hp=2000, atk=15, df=15)
 covid.resist.append('中毒')
 s = YuiSkill('VX神經毒氣', dmg=0, cd=inf, r=3)
 s.cond = 50
-s.debuff = YuiDebuff('中毒', '傷害', 18, last=inf)
+s.debuff = YuiDebuff('中毒', '傷害', 16, last=inf)
 covid.skill.append(s)
 s = YuiSkill('多重毒箭', cd=1, r=2)
-s.debuff = YuiDebuff('中毒', '傷害', 10, last=3)
+s.debuff = YuiDebuff('中毒', '傷害', 8, last=3)
 covid.skill.append(s)
 s = YuiSkill('毒箭射擊')
-s.debuff = YuiDebuff('中毒', '傷害', 10, last=3)
+s.debuff = YuiDebuff('中毒', '傷害', 8, last=3)
 covid.skill.append(s)
 
-tambora = YuiAgent('坦博拉', hp=1200, atk=20, df=15)
+prospero = YuiAgent('普羅斯佩羅', hp=1800, atk=20, df=18)
+skeleton1 = YuiAgent('骷髏兵1', hp=200, atk=15, df=15)
+skeleton1.hate = -1
+skeleton1.skill.append(YuiSkill('劈砍'))
+skeleton2 = YuiAgent('骷髏兵2', hp=200, atk=15, df=15)
+skeleton2.hate = -1
+skeleton2.skill.append(YuiSkill('劈砍'))
+prospero.summon(skeleton1)
+prospero.summon(skeleton2)
+bone_dragon = YuiAgent('骨龍', hp=2000, atk=20, df=15)
+bone_dragon.skill.append(YuiSkill('量子吐息', dmg=15, r=2))
+bone_dragon.hate = -1
+s = YuiSummon('召喚骨龍', cd=inf, summon=bone_dragon)
+s.cond = 50
+prospero.skill.append(s)
+s = YuiSkill('鼓舞', dmg=0, cd=3, r=3, target='friend')
+s.debuff = YuiBuff('鼓舞', '攻擊力', 5, last=3)
+prospero.skill.append(s)
+s = YuiSkill('不死光環', dmg=0, cd=4, r=3, target='friend')
+s.debuff = YuiBuff('回復', '回復', 15, last=3)
+prospero.skill.append(s)
+prospero.skill.append(YuiSkill('劈砍'))
+
+tambora = YuiAgent('坦博拉', hp=1800, atk=20, df=15)
 tambora.resist.append('燃燒')
-volcano = YuiAgent('火山噴發', hp=1, atk=15, df=0)
+volcano = YuiAgent('火山噴發', hp=1, atk=12, df=0)
 volcano.skill.append(YuiSkill('火山灰流', dmg=30, cd=inf, r=3))
 volcano.skill.append(YuiSkill('浮石打擊', r=3))
 s = YuiSummon('火山噴發', cd=inf, summon=volcano)
 s.is_env = True
 s.cond = 50
 tambora.skill.append(s)
-tambora.skill.append(YuiSkill('火炎噴射', dmg=12, cd=2, r=2))
+tambora.skill.append(YuiSkill('火炎噴射', cd=2, r=2))
 tambora.skill.append(YuiSkill('劈砍'))
 s = YuiSkill('血怒', target='self', dmg=0)
-s.debuff = YuiBuff('血怒', '攻擊力', 1, last=3)
+s.debuff = YuiBuff('血怒', '攻擊力', 1, last=2)
 tambora.passive.append(s)
 
 
@@ -628,41 +770,48 @@ def add_summon(t):
 
 window = tk.Tk()
 window.title('奧古斯塔尼亞戰記')
-window.geometry('1000x600')
+#window.title('オーガスタニヤ戦記')
+window.geometry('1000x620')
 
 all_hero = {'貝羅斯': belos, '塞萊茜布': celexib, '蕾吉娜': regina, '喬恩': donnet, '艾莉安': elion,
-            '薇莉安娜': willianna, '琉塔': lyuda, '哈拉爾德': harald, '瑪格麗特': magret, '歐若拉': eurora,
-            '伊利亞': elijah, '多米妮安': dominion, '莉姬亞': ligeia,
+            '薇莉安娜': willianna, '琉塔': lyuda, '哈拉爾德': harald, '瑪格麗特': margrete, '歐若拉': aurora,
+            '莉布絲':libuse, '奈菲提': neferti, '伊利亞': elijah, '多米妮安': dominion, '莉姬亞': ligeia,
             '西里烏斯': sirius, '少爺': bouya, '卡伊達': kaeda, '阿蒂雅': adeak, '黃泉引路人': way_guider,
-            '安朵蕾雅絲': andreas,
-            '哈密特': hammett, '克維德': covid, '坦博拉': tambora}
+            '安朵蕾雅絲': andreas, '船長格林威治': greenwich,
+            '哈密特': hammett, '克維德': covid,
+            '普羅斯佩羅': prospero, '骷髏兵1': skeleton1, '骷髏兵2': skeleton2,
+            '坦博拉': tambora}
+
 
 t1 = [None, None, None, None, None]
 t2 = [None, None]
+t3 = [None, None, None, None, None]
 
 yui_discourse = tk.Text(window, height=10)
 yui_discourse.pack()  # 會話界面
-yui_discourse.place(x=200, y=200)
+yui_discourse.place(x=200, y=220)
+yui_discourse.tag_config('t2', foreground='blue')
+yui_discourse.tag_config('t1', foreground='green')
 
 # 英雄圖標
 
 hero1_frame = tk.Frame(window)
-hero1_frame.place(relx=0.05, rely=0.9, anchor="sw")
+hero1_frame.place(relx=0.02, rely=0.93, anchor="sw")
 
 hero2_frame = tk.Frame(window)
-hero2_frame.place(relx=0.21, rely=0.9, anchor="sw")
+hero2_frame.place(relx=0.18, rely=0.93, anchor="sw")
 
 hero3_frame = tk.Frame(window)
-hero3_frame.place(relx=0.37, rely=0.9, anchor="sw")
+hero3_frame.place(relx=0.34, rely=0.93, anchor="sw")
 
 hero4_frame = tk.Frame(window)
-hero4_frame.place(relx=0.53, rely=0.9, anchor="sw")
+hero4_frame.place(relx=0.5, rely=0.93, anchor="sw")
 
 hero5_frame = tk.Frame(window)
-hero5_frame.place(relx=0.69, rely=0.9, anchor="sw")
+hero5_frame.place(relx=0.66, rely=0.93, anchor="sw")
 
 summon_frame = tk.Frame(window)
-summon_frame.place(relx=0.85, rely=0.95, anchor="sw")
+summon_frame.place(relx=0.83, rely=0.97, anchor="sw")
 
 icon1 = tk.Label(hero1_frame, anchor="w")
 icon1.pack(pady=5)
@@ -682,70 +831,101 @@ icon5.pack(pady=5)
 icon_summon = tk.Label(summon_frame, anchor="w")
 icon_summon.pack(pady=5)
 
-name1 = tk.Label(hero1_frame, text="1", font=("Arial", 12), anchor="w")
+name1 = tk.Label(hero1_frame, text="1", font=("Arial", 12), anchor="w", fg="green")
 name1.pack()
 
-name2 = tk.Label(hero2_frame, text="", font=("Arial", 12), anchor="w")
+name2 = tk.Label(hero2_frame, text="", font=("Arial", 12), anchor="w", fg="green")
 name2.pack()
 
-name3 = tk.Label(hero3_frame, text="", font=("Arial", 12), anchor="w")
+name3 = tk.Label(hero3_frame, text="", font=("Arial", 12), anchor="w", fg="green")
 name3.pack()
 
-name4 = tk.Label(hero4_frame, text="", font=("Arial", 12), anchor="w")
+name4 = tk.Label(hero4_frame, text="", font=("Arial", 12), anchor="w", fg="green")
 name4.pack()
 
-name5 = tk.Label(hero5_frame, text="", font=("Arial", 12), anchor="w")
+name5 = tk.Label(hero5_frame, text="", font=("Arial", 12), anchor="w", fg="green")
 name5.pack()
 
-name_summon = tk.Label(summon_frame, text="", font=("Arial", 12), anchor="w")
+name_summon = tk.Label(summon_frame, text="", font=("Arial", 12), anchor="w", fg="green")
 name_summon.pack()
-title_summon = tk.Label(summon_frame, text="召喚獸", font=("Arial", 12))
+title_summon = tk.Label(summon_frame, text="召喚獸", font=("Arial", 12), fg="green")
+#title_summon = tk.Label(summon_frame, text="召喚獣", font=("Arial", 12))
 title_summon.pack()
+
+# 英雄圖標2
+
+hero21_frame = tk.Frame(window)
+hero22_frame = tk.Frame(window)
+hero23_frame = tk.Frame(window)
+hero24_frame = tk.Frame(window)
+hero25_frame = tk.Frame(window)
+summon_frame2 = tk.Frame(window)
+
+
+icon21 = tk.Label(hero21_frame, anchor="w")
+icon22 = tk.Label(hero22_frame, anchor="w")
+icon23 = tk.Label(hero23_frame, anchor="w")
+icon24 = tk.Label(hero24_frame, anchor="w")
+icon25 = tk.Label(hero25_frame, anchor="w")
+icon_summon2 = tk.Label(summon_frame2, anchor="w")
+
+
+name21 = tk.Label(hero21_frame, text="", font=("Arial", 12), anchor="w", fg="blue")
+name22 = tk.Label(hero22_frame, text="", font=("Arial", 12), anchor="w", fg="blue")
+name23 = tk.Label(hero23_frame, text="", font=("Arial", 12), anchor="w", fg="blue")
+name24 = tk.Label(hero24_frame, text="", font=("Arial", 12), anchor="w", fg="blue")
+name25 = tk.Label(hero25_frame, text="", font=("Arial", 12), anchor="w", fg="blue")
+name_summon2 = tk.Label(summon_frame2, text="", font=("Arial", 12), anchor="w", fg="blue")
+title_summon2 = tk.Label(summon_frame2, text="召喚獸", font=("Arial", 12), fg="blue")
+#title_summon = tk.Label(summon_frame, text="召喚獣", font=("Arial", 12))
 
 # boss圖標
 
-boss_frame2 = tk.Frame(window)
-boss_frame2.place(relx=0.5, rely=0.3, anchor="sw")
-
-icon7 = tk.Label(boss_frame2, anchor="w")
-icon7.pack(pady=5)
-
-name7 = tk.Label(boss_frame2, text="", font=("Arial", 12), anchor="w")
-name7.pack()
-
 boss_frame = tk.Frame(window)
-boss_frame.place(relx=0.35, rely=0.3, anchor="sw")
-
 icon6 = tk.Label(boss_frame, anchor="w")
-icon6.pack(pady=5)
-
 name6 = tk.Label(boss_frame, text="", font=("Arial", 12), anchor="w")
-name6.pack()
+
+boss_frame2 = tk.Frame(window)
+icon7 = tk.Label(boss_frame2, anchor="w")
+name7 = tk.Label(boss_frame2, text="", font=("Arial", 12), anchor="w")
+
+boss_frame3 = tk.Frame(window)
+icon8 = tk.Label(boss_frame3, anchor="w")
+name8 = tk.Label(boss_frame3, text="", font=("Arial", 12), anchor="w")
+
+boss_frame4 = tk.Frame(window)
+icon9 = tk.Label(boss_frame4, anchor="w")
+name9 = tk.Label(boss_frame4, text="", font=("Arial", 12), anchor="w")
 
 # 顯示相關函式
 
 icons = [icon1, icon2, icon3, icon4, icon5, icon_summon]
 names = [name1, name2, name3, name4, name5, name_summon]
 
-icons2 = [icon6, icon7]
-names2 = [name6, name7]
+icons2 = [icon6, icon7, icon8, icon9]
+names2 = [name6, name7, name8, name9]
+
+icons3 = [icon21, icon22, icon23, icon24, icon25, icon_summon2]
+names3 = [name21, name22, name23, name24, name25, name_summon2]
 
 
 def get_hp_text(name):
     hero = all_hero[name]
     hp = hero.hp
-    return name + ' HP:' + str(hp) + '/' + str(hp)
+    return hero.name + '\nHP:' + str(hp) + '/' + str(hp)
 
 
 def update_hp_text(chara):
     name1 = chara.name
-    for name2 in names:
+    if chara.team == 1:
+        name_t = names
+    elif chara.team == 2:
+        name_t = names2
+    else:
+        name_t = names3
+    for name2 in name_t:
         if name2['text'].startswith(name1):
-            name2.config(text=name1 + ' HP:' + str(chara.hp_now) + '/' + str(chara.hp))
-            break
-    for name2 in names2:
-        if name2['text'].startswith(name1):
-            name2.config(text=name1 + ' HP:' + str(chara.hp_now) + '/' + str(chara.hp))
+            name2.config(text=name1 + '\nHP:' + str(chara.hp_now) + '/' + str(chara.hp))
             break
 
 
@@ -767,6 +947,8 @@ images = {
     "哈拉爾德": load_image(yui_dir + "哈拉爾德.png"),
     "瑪格麗特": load_image(yui_dir + "瑪格麗特.png"),
     "歐若拉": load_image(yui_dir + "歐若拉.png"),
+    "莉布絲": load_image(yui_dir + "莉布絲.png"),
+    "奈菲提": load_image(yui_dir + "奈菲提.png"),
     "伊利亞": load_image(yui_dir + "伊利亞.png"),
     "多米妮安": load_image(yui_dir + "多米妮安.png"),
     "莉姬亞": load_image(yui_dir + "莉姬亞.png"),
@@ -776,8 +958,12 @@ images = {
     "阿蒂雅": load_image(yui_dir + "阿蒂雅.png"),
     "黃泉引路人": load_image(yui_dir + "黃泉引路人.png"),
     "安朵蕾雅絲": load_image(yui_dir + "安朵蕾雅絲.png"),
+    "船長格林威治": load_image(yui_dir + "船長格林威治.png"),
     "哈密特": load_image(yui_dir + "哈密特.png"),
     "克維德": load_image(yui_dir + "克維德.png"),
+    "普羅斯佩羅": load_image(yui_dir + "普羅斯佩羅.png"),
+    "骷髏兵": load_image(yui_dir + "骷髏兵.png"),
+    "骨龍": load_image(yui_dir + "骨龍.png"),
     "坦博拉": load_image(yui_dir + "坦博拉.png")
 }
 
@@ -790,33 +976,46 @@ for i, choice in enumerate(t2):
     names2[i].config(text='')
 
 
-def update_display(t1):
+def update_display(t1, team=1):
+    if team == 1:
+        icon_choose = icons
+        name_choose = names
+    else:
+        icon_choose = icons3
+        name_choose = names3
+    icon_choose[5].config(image=images['空白'])
+    name_choose[5].config(text='')
     for i, choice in enumerate(t1):
         if choice:
-            if names[i]['text'].startswith('喬恩') and choice != '喬恩':
-                icons[5].config(image=images['空白'])
-                names[5].config(text='')
-            icons[i].config(image=images[choice])
-            names[i].config(text=get_hp_text(choice))
+            icon_choose[i].config(image=images[choice])
+            name_choose[i].config(text=get_hp_text(choice))
             if choice == '喬恩':
-                icons[5].config(image=images['艾莉安'])
-                names[5].config(text=get_hp_text('艾莉安'))
+                icon_choose[5].config(image=images['艾莉安'])
+                name_choose[5].config(text=get_hp_text('艾莉安'))
         else:
-            icons[i].config(image=images['空白'])
-            names[i].config(text='')
+            icon_choose[i].config(image=images['空白'])
+            name_choose[i].config(text='')
 
 
 def update_display2(t2):
+    icons2[1].config(image=images['空白'])
+    names2[1].config(text='')
+    icons2[2].config(image=images['空白'])
+    names2[2].config(text='')
+    icons2[3].config(image=images['空白'])
+    names2[3].config(text='')
     for i, choice in enumerate(t2):
         if choice:
             icons2[i].config(image=images[choice])
             names2[i].config(text=get_hp_text(choice))
+            if choice == '普羅斯佩羅':
+                icons2[1].config(image=images['骷髏兵'])
+                names2[1].config(text=get_hp_text('骷髏兵1'))
+                icons2[2].config(image=images['骷髏兵'])
+                names2[2].config(text=get_hp_text('骷髏兵2'))
         else:
             icons2[i].config(image=images['空白'])
             names2[i].config(text='')
-    if len(t2) == 1:
-        icons2[1].config(image=images['空白'])
-        names2[1].config(text='')
 
 
 # 英雄選擇
@@ -824,10 +1023,17 @@ def update_display2(t2):
 
 def hero(option, n):
     if not ongoing:
-        if option in t1:
-            t1[t1.index(option)] = None
-        t1[n] = option
-        update_display(t1)
+        if n < 5:
+            if option in t1:
+                t1[t1.index(option)] = None
+            t1[n] = option
+            update_display(t1, 1)
+        else:
+            n = n - 5
+            if option in t3:
+                t3[t3.index(option)] = None
+            t3[n] = option
+            update_display(t3, 3)
 
 
 def add_boss(option):
@@ -840,18 +1046,15 @@ def add_boss(option):
 
 
 menu = tk.Menu(window, tearoff=False)
-menu.add_command(label="貝羅斯（戰士，坦克）", command=lambda: hero('貝羅斯', 0))
-menu.add_command(label="塞萊茜布（牧師，治療）", command=lambda: hero('塞萊茜布', 0))
-menu.add_command(label="蕾吉娜（狂戰士，傷害輸出）", command=lambda: hero('蕾吉娜', 0))
-menu.add_command(label="喬恩（召喚師，傷害輸出）", command=lambda: hero('喬恩', 0))
-menu.add_command(label="薇莉安娜（弓箭手，傷害輸出）", command=lambda: hero('薇莉安娜', 0))
-menu.add_command(label="琉塔（狙擊手，傷害輸出）", command=lambda: hero('琉塔', 0))
-menu.add_command(label="哈拉爾德（戰士，治療/坦克）", command=lambda: hero('哈拉爾德', 0))
-menu.add_command(label="瑪格麗特（弓箭手，治療/傷害輸出）", command=lambda: hero('瑪格麗特', 0))
-menu.add_command(label="歐若拉（聖騎士，治療/輔助）", command=lambda: hero('歐若拉', 0))
-menu.add_command(label="伊利亞（煉金術師，輔助/傷害輸出）", command=lambda: hero('伊利亞', 0))
-menu.add_command(label="多米妮安（牧師，治療/輔助）", command=lambda: hero('多米妮安', 0))
-menu.add_command(label="莉姬亞（刺客，傷害輸出）", command=lambda: hero('莉姬亞', 0))
+menu2 = tk.Menu(window, tearoff=False)
+menu3 = tk.Menu(window, tearoff=False)
+menu4 = tk.Menu(window, tearoff=False)
+menu5 = tk.Menu(window, tearoff=False)
+menu21 = tk.Menu(window, tearoff=False)
+menu22 = tk.Menu(window, tearoff=False)
+menu23 = tk.Menu(window, tearoff=False)
+menu24 = tk.Menu(window, tearoff=False)
+menu25 = tk.Menu(window, tearoff=False)
 
 
 def show_menu(event=None):
@@ -859,22 +1062,9 @@ def show_menu(event=None):
 
 
 button1 = tk.Button(window, text="選擇英雄1")
-button1.place(relx=0.1, rely=0.95, anchor="sw")
+#button1 = tk.Button(window, text="キャラクター1を選択")
+button1.place(relx=0.07, rely=0.98, anchor="sw")
 button1.bind("<Button-1>", show_menu)
-
-menu2 = tk.Menu(window, tearoff=False)
-menu2.add_command(label="貝羅斯（戰士，坦克）", command=lambda: hero('貝羅斯', 1))
-menu2.add_command(label="塞萊茜布（牧師，治療）", command=lambda: hero('塞萊茜布', 1))
-menu2.add_command(label="蕾吉娜（狂戰士，傷害輸出）", command=lambda: hero('蕾吉娜', 1))
-menu2.add_command(label="喬恩（召喚師，傷害輸出）", command=lambda: hero('喬恩', 1))
-menu2.add_command(label="薇莉安娜（弓箭手，傷害輸出）", command=lambda: hero('薇莉安娜', 1))
-menu2.add_command(label="琉塔（狙擊手，傷害輸出）", command=lambda: hero('琉塔', 1))
-menu2.add_command(label="哈拉爾德（戰士，治療/坦克）", command=lambda: hero('哈拉爾德', 1))
-menu2.add_command(label="瑪格麗特（弓箭手，治療/傷害輸出）", command=lambda: hero('瑪格麗特', 1))
-menu2.add_command(label="歐若拉（聖騎士，治療/輔助）", command=lambda: hero('歐若拉', 1))
-menu2.add_command(label="伊利亞（煉金術師，輔助/傷害輸出）", command=lambda: hero('伊利亞', 1))
-menu2.add_command(label="多米妮安（牧師，治療/輔助）", command=lambda: hero('多米妮安', 1))
-menu2.add_command(label="莉姬亞（刺客，傷害輸出）", command=lambda: hero('莉姬亞', 1))
 
 
 def show_menu2(event=None):
@@ -882,22 +1072,9 @@ def show_menu2(event=None):
 
 
 button2 = tk.Button(window, text="選擇英雄2")
-button2.place(relx=0.25, rely=0.95, anchor="sw")
+#button2 = tk.Button(window, text="キャラクター2を選択")
+button2.place(relx=0.22, rely=0.98, anchor="sw")
 button2.bind("<Button-1>", show_menu2)
-
-menu3 = tk.Menu(window, tearoff=False)
-menu3.add_command(label="貝羅斯（戰士，坦克）", command=lambda: hero('貝羅斯', 2))
-menu3.add_command(label="塞萊茜布（牧師，治療）", command=lambda: hero('塞萊茜布', 2))
-menu3.add_command(label="蕾吉娜（狂戰士，傷害輸出）", command=lambda: hero('蕾吉娜', 2))
-menu3.add_command(label="喬恩（召喚師，傷害輸出）", command=lambda: hero('喬恩', 2))
-menu3.add_command(label="薇莉安娜（弓箭手，傷害輸出）", command=lambda: hero('薇莉安娜', 2))
-menu3.add_command(label="琉塔（狙擊手，傷害輸出）", command=lambda: hero('琉塔', 2))
-menu3.add_command(label="哈拉爾德（戰士，治療/坦克）", command=lambda: hero('哈拉爾德', 2))
-menu3.add_command(label="瑪格麗特（弓箭手，治療/傷害輸出）", command=lambda: hero('瑪格麗特', 2))
-menu3.add_command(label="歐若拉（聖騎士，治療/輔助）", command=lambda: hero('歐若拉', 2))
-menu3.add_command(label="伊利亞（煉金術師，輔助/傷害輸出）", command=lambda: hero('伊利亞', 2))
-menu3.add_command(label="多米妮安（牧師，治療/輔助）", command=lambda: hero('多米妮安', 2))
-menu3.add_command(label="莉姬亞（刺客，傷害輸出）", command=lambda: hero('莉姬亞', 2))
 
 
 def show_menu3(event=None):
@@ -905,22 +1082,9 @@ def show_menu3(event=None):
 
 
 button3 = tk.Button(window, text="選擇英雄3")
-button3.place(relx=0.4, rely=0.95, anchor="sw")
+#button3 = tk.Button(window, text="キャラクター3を選択")
+button3.place(relx=0.37, rely=0.98, anchor="sw")
 button3.bind("<Button-1>", show_menu3)
-
-menu4 = tk.Menu(window, tearoff=False)
-menu4.add_command(label="貝羅斯（戰士，坦克）", command=lambda: hero('貝羅斯', 3))
-menu4.add_command(label="塞萊茜布（牧師，治療）", command=lambda: hero('塞萊茜布', 3))
-menu4.add_command(label="蕾吉娜（狂戰士，傷害輸出）", command=lambda: hero('蕾吉娜', 3))
-menu4.add_command(label="喬恩（召喚師，傷害輸出）", command=lambda: hero('喬恩', 3))
-menu4.add_command(label="薇莉安娜（弓箭手，傷害輸出）", command=lambda: hero('薇莉安娜', 3))
-menu4.add_command(label="琉塔（狙擊手，傷害輸出）", command=lambda: hero('琉塔', 3))
-menu4.add_command(label="哈拉爾德（戰士，治療/坦克）", command=lambda: hero('哈拉爾德', 3))
-menu4.add_command(label="瑪格麗特（弓箭手，治療/傷害輸出）", command=lambda: hero('瑪格麗特', 3))
-menu4.add_command(label="歐若拉（聖騎士，治療/輔助）", command=lambda: hero('歐若拉', 3))
-menu4.add_command(label="伊利亞（煉金術師，輔助/傷害輸出）", command=lambda: hero('伊利亞', 3))
-menu4.add_command(label="多米妮安（牧師，治療/輔助）", command=lambda: hero('多米妮安', 3))
-menu4.add_command(label="莉姬亞（刺客，傷害輸出）", command=lambda: hero('莉姬亞', 3))
 
 
 def show_menu4(event=None):
@@ -928,31 +1092,98 @@ def show_menu4(event=None):
 
 
 button4 = tk.Button(window, text="選擇英雄4")
-button4.place(relx=0.55, rely=0.95, anchor="sw")
+#button4 = tk.Button(window, text="キャラクター4を選択")
+button4.place(relx=0.52, rely=0.98, anchor="sw")
 button4.bind("<Button-1>", show_menu4)
-
-menu5 = tk.Menu(window, tearoff=False)
-menu5.add_command(label="貝羅斯（戰士，坦克）", command=lambda: hero('貝羅斯', 4))
-menu5.add_command(label="塞萊茜布（牧師，治療）", command=lambda: hero('塞萊茜布', 4))
-menu5.add_command(label="蕾吉娜（狂戰士，傷害輸出）", command=lambda: hero('蕾吉娜', 4))
-menu5.add_command(label="喬恩（召喚師，傷害輸出）", command=lambda: hero('喬恩', 4))
-menu5.add_command(label="薇莉安娜（弓箭手，傷害輸出）", command=lambda: hero('薇莉安娜', 4))
-menu5.add_command(label="琉塔（狙擊手，傷害輸出）", command=lambda: hero('琉塔', 4))
-menu5.add_command(label="哈拉爾德（戰士，治療/坦克）", command=lambda: hero('哈拉爾德', 4))
-menu5.add_command(label="瑪格麗特（弓箭手，治療/傷害輸出）", command=lambda: hero('瑪格麗特', 4))
-menu5.add_command(label="歐若拉（聖騎士，治療/輔助）", command=lambda: hero('歐若拉', 4))
-menu5.add_command(label="伊利亞（煉金術師，輔助/傷害輸出）", command=lambda: hero('伊利亞', 4))
-menu5.add_command(label="多米妮安（牧師，治療/輔助）", command=lambda: hero('多米妮安', 4))
-menu5.add_command(label="莉姬亞（刺客，傷害輸出）", command=lambda: hero('莉姬亞', 4))
 
 
 def show_menu5(event=None):
-    menu5.post(button4.winfo_rootx(), button5.winfo_rooty())
+    menu5.post(button5.winfo_rootx(), button5.winfo_rooty())
 
 
 button5 = tk.Button(window, text="選擇英雄5")
-button5.place(relx=0.7, rely=0.95, anchor="sw")
+#button5 = tk.Button(window, text="キャラクター5を選択")
+button5.place(relx=0.68, rely=0.98, anchor="sw")
 button5.bind("<Button-1>", show_menu5)
+
+
+def show_menu21(event=None):
+    menu21.post(button21.winfo_rootx(), button21.winfo_rooty())
+
+
+button21 = tk.Button(window, text="選擇英雄1")
+#button21 = tk.Button(window, text="キャラクター1を選択")
+button21.bind("<Button-1>", show_menu21)
+
+
+def show_menu22(event=None):
+    menu22.post(button22.winfo_rootx(), button22.winfo_rooty())
+
+
+button22 = tk.Button(window, text="選擇英雄2")
+#button22 = tk.Button(window, text="キャラクター2を選択")
+button22.bind("<Button-1>", show_menu22)
+
+
+def show_menu23(event=None):
+    menu23.post(button23.winfo_rootx(), button23.winfo_rooty())
+
+
+button23 = tk.Button(window, text="選擇英雄3")
+#button23 = tk.Button(window, text="キャラクター3を選択")
+button23.bind("<Button-1>", show_menu23)
+
+
+def show_menu24(event=None):
+    menu24.post(button24.winfo_rootx(), button24.winfo_rooty())
+
+
+button24 = tk.Button(window, text="選擇英雄4")
+#button24 = tk.Button(window, text="キャラクター4を選択")
+button24.bind("<Button-1>", show_menu24)
+
+
+def show_menu25(event=None):
+    menu25.post(button25.winfo_rootx(), button25.winfo_rooty())
+
+
+button25 = tk.Button(window, text="選擇英雄5")
+#button25 = tk.Button(window, text="キャラクター5を選択")
+button25.bind("<Button-1>", show_menu25)
+
+menu_all = [menu, menu2, menu3, menu4, menu5,
+            menu21, menu22, menu23, menu24, menu25]
+for i, m in enumerate(menu_all):
+    m.add_command(label="貝羅斯（戰士，坦克）", command=lambda i=i: hero('貝羅斯', i))
+    m.add_command(label="塞萊茜布（牧師，治療）", command=lambda i=i: hero('塞萊茜布', i))
+    m.add_command(label="蕾吉娜（狂戰士，傷害輸出）", command=lambda i=i: hero('蕾吉娜', i))
+    m.add_command(label="喬恩（召喚師，傷害輸出/輔助）", command=lambda i=i: hero('喬恩', i))
+    m.add_command(label="薇莉安娜（弓箭手，傷害輸出）", command=lambda i=i: hero('薇莉安娜', i))
+    m.add_command(label="琉塔（狙擊手，傷害輸出）", command=lambda i=i: hero('琉塔', i))
+    m.add_command(label="哈拉爾德（戰士，治療/坦克）", command=lambda i=i: hero('哈拉爾德', i))
+    m.add_command(label="瑪格麗特（弓箭手，治療/傷害輸出）", command=lambda i=i: hero('瑪格麗特', i))
+    m.add_command(label="歐若拉（聖騎士，治療/輔助）", command=lambda i=i: hero('歐若拉', i))
+    m.add_command(label="莉布絲（死靈法師，傷害輸出）", command=lambda i=i: hero('莉布絲', i))
+    m.add_command(label="奈菲提（法師，輔助/傷害輸出）", command=lambda i=i: hero('奈菲提', i))
+    m.add_command(label="伊利亞（煉金術師，輔助/傷害輸出）", command=lambda i=i: hero('伊利亞', i))
+    m.add_command(label="多米妮安（牧師，治療/輔助）", command=lambda i=i: hero('多米妮安', i))
+    m.add_command(label="莉姬亞（刺客，傷害輸出）", command=lambda i=i: hero('莉姬亞', i))
+    '''
+    menu.add_command(label="ベロス（戦士，防御）", command=lambda: hero('貝羅斯', 0))
+    menu.add_command(label="セレクシーブ（聖職者，治療）", command=lambda: hero('塞萊茜布', 0))
+    menu.add_command(label="レジーナ（バーサーカー，火力）", command=lambda: hero('蕾吉娜', 0))
+    menu.add_command(label="ジョン（召喚士，火力/支援）", command=lambda: hero('喬恩', 0))
+    menu.add_command(label="ウェリアナ（弓使い，火力）", command=lambda: hero('薇莉安娜', 0))
+    menu.add_command(label="リューダ（スナイパー，火力）", command=lambda: hero('琉塔', 0))
+    menu.add_command(label="ハーラル（戦士，治療/前衛）", command=lambda: hero('哈拉爾德', 0))
+    menu.add_command(label="マルグレーテ（弓使い，治療/火力）", command=lambda: hero('瑪格麗特', 0))
+    menu.add_command(label="オーロラ（聖騎士，治療/支援）", command=lambda: hero('歐若拉', 0))
+    menu.add_command(label="リブシェ（呪術師，支援/火力）", command=lambda: hero('莉布絲', 0))
+    menu.add_command(label="ネフェルティ（術師，支援/火力）", command=lambda: hero('奈菲提', 0))
+    menu.add_command(label="イライジャ（錬金術師，支援/火力）", command=lambda: hero('伊利亞', 0))
+    menu.add_command(label="ドミニオン（聖職者，治療/支援）", command=lambda: hero('多米妮安', 0))
+    menu.add_command(label="ライジーア（暗殺者，火力）", command=lambda: hero('莉姬亞', 0))
+    '''
 
 # 敵人選擇
 
@@ -962,9 +1193,22 @@ menu6.add_command(label="少爺（刺客型）", command=lambda: add_boss('少�
 menu6.add_command(label="卡伊達＆阿蒂雅（陷阱型）", command=lambda: add_boss('卡伊達'))
 menu6.add_command(label="黃泉引路人（詛咒型）", command=lambda: add_boss('黃泉引路人'))
 menu6.add_command(label="安朵蕾雅絲（群攻法師型）", command=lambda: add_boss('安朵蕾雅絲'))
+menu6.add_command(label="船長格林威治（控制型）", command=lambda: add_boss('船長格林威治'))
 menu6.add_command(label="哈密特（弱化型）", command=lambda: add_boss('哈密特'))
 menu6.add_command(label="克維德（持續傷害型）", command=lambda: add_boss('克維德'))
+menu6.add_command(label="普羅斯佩羅(增益型）", command=lambda: add_boss('普羅斯佩羅'))
 menu6.add_command(label="坦博拉（狂戰士型）", command=lambda: add_boss('坦博拉'))
+'''
+menu6.add_command(label="シリウス（治療系）", command=lambda: add_boss('西里烏斯'))
+menu6.add_command(label="『坊や』（暗殺者系）", command=lambda: add_boss('少爺'))
+menu6.add_command(label="カーイダ＆アデアック（罠系）", command=lambda: add_boss('卡伊達'))
+menu6.add_command(label="ウエーガイダー（呪い系）", command=lambda: add_boss('黃泉引路人'))
+menu6.add_command(label="アンドレアス（術師系）", command=lambda: add_boss('安朵蕾雅絲'))
+menu6.add_command(label="船長グリニッジ（制御系）", command=lambda: add_boss('船長格林威治'))
+menu6.add_command(label="ハメット（弱体化系）", command=lambda: add_boss('哈密特'))
+menu6.add_command(label="こウィード（持続ダメージ系）", command=lambda: add_boss('克維德'))
+menu6.add_command(label="タンボラ（バーサーカー系）", command=lambda: add_boss('坦博拉'))
+'''
 
 
 def show_menu6(event=None):
@@ -972,27 +1216,151 @@ def show_menu6(event=None):
 
 
 button6 = tk.Button(window, text="選擇要挑戰的boss")
-button6.place(relx=0.2, rely=0.3, anchor="sw")
+#button6 = tk.Button(window, text="挑戦したいボスを選択")
 button6.bind("<Button-1>", show_menu6)
 
+# 模式選擇
+
+
+def pve():
+    hero21_frame.place_forget()
+    hero22_frame.place_forget()
+    hero23_frame.place_forget()
+    hero24_frame.place_forget()
+    hero25_frame.place_forget()
+    summon_frame2.place_forget()
+    icon21.pack_forget()
+    icon22.pack_forget()
+    icon23.pack_forget()
+    icon24.pack_forget()
+    icon25.pack_forget()
+    icon_summon2.pack_forget()
+    name21.pack_forget()
+    name22.pack_forget()
+    name23.pack_forget()
+    name24.pack_forget()
+    name25.pack_forget()
+    name_summon2.pack_forget()
+    title_summon2.pack_forget()
+    button21.place_forget()
+    button22.place_forget()
+    button23.place_forget()
+    button24.place_forget()
+    button25.place_forget()
+
+    boss_frame4.place(relx=0.8, rely=0.3, anchor="sw")
+    boss_frame3.place(relx=0.65, rely=0.3, anchor="sw")
+    boss_frame.place(relx=0.35, rely=0.3, anchor="sw")
+    boss_frame2.place(relx=0.5, rely=0.3, anchor="sw")
+    icon6.pack(pady=5)
+    name6.pack()
+    icon7.pack(pady=5)
+    name7.pack()
+    icon8.pack(pady=5)
+    name8.pack()
+    icon9.pack(pady=5)
+    name9.pack()
+    button6.place(relx=0.2, rely=0.3, anchor="sw")
+
+
+def pvp():
+    boss_frame4.place_forget()
+    boss_frame3.place_forget()
+    boss_frame.place_forget()
+    boss_frame2.place_forget()
+    icon6.pack_forget()
+    name6.pack_forget()
+    icon7.pack_forget()
+    name7.pack_forget()
+    icon8.pack_forget()
+    name8.pack_forget()
+    icon9.pack_forget()
+    name9.pack_forget()
+    button6.place_forget()
+
+    hero21_frame.place(relx=0.02, rely=0.28, anchor="sw")
+    hero22_frame.place(relx=0.18, rely=0.28, anchor="sw")
+    hero23_frame.place(relx=0.34, rely=0.28, anchor="sw")
+    hero24_frame.place(relx=0.5, rely=0.28, anchor="sw")
+    hero25_frame.place(relx=0.66, rely=0.28, anchor="sw")
+    summon_frame2.place(relx=0.83, rely=0.33, anchor="sw")
+    icon21.pack(pady=5)
+    icon22.pack(pady=5)
+    icon23.pack(pady=5)
+    icon24.pack(pady=5)
+    icon25.pack(pady=5)
+    icon_summon2.pack(pady=5)
+    name21.pack()
+    name22.pack()
+    name23.pack()
+    name24.pack()
+    name25.pack()
+    name_summon2.pack()
+    title_summon2.pack()
+    button21.place(relx=0.07, rely=0.33, anchor="sw")
+    button22.place(relx=0.22, rely=0.33, anchor="sw")
+    button23.place(relx=0.37, rely=0.33, anchor="sw")
+    button24.place(relx=0.52, rely=0.33, anchor="sw")
+    button25.place(relx=0.68, rely=0.33, anchor="sw")
+
 # 開始戰鬥
+
 
 lock = threading.Lock()
 
 cd_var = tk.IntVar(value=2)
 cd = 1
 
-tk.Radiobutton(window, text="慢速遊戲", variable=cd_var, value=2).place(x=810, y=200)
-tk.Radiobutton(window, text="快速遊戲", variable=cd_var, value=1).place(x=810, y=230)
-tk.Radiobutton(window, text="極速遊戲", variable=cd_var, value=0).place(x=810, y=260)
+tk.Radiobutton(window, text="慢速遊戲", variable=cd_var, value=2).place(x=810, y=220)
+tk.Radiobutton(window, text="快速遊戲", variable=cd_var, value=1).place(x=810, y=250)
+tk.Radiobutton(window, text="極速遊戲", variable=cd_var, value=0).place(x=810, y=280)
+'''
+tk.Radiobutton(window, text="一倍速", variable=cd_var, value=2).place(x=810, y=200)
+tk.Radiobutton(window, text="二倍速", variable=cd_var, value=1).place(x=810, y=230)
+tk.Radiobutton(window, text="ハイスピード", variable=cd_var, value=0).place(x=810, y=260)
+'''
 
 
-def battle_disp(v):
+class CheckMode(threading.Thread):
+    def __init__(self):
+        threading.Thread.__init__(self, daemon=True)
+        self.mode = tk.IntVar(value=1)
+
+    def run(self):
+        while 1:
+            if self.mode.get() == 1:
+                pve()
+            else:
+                pvp()
+            time.sleep(0.1)
+
+
+check_mode = CheckMode()
+check_mode.start()
+
+tk.Radiobutton(window, text="挑戰BOSS", variable=check_mode.mode, value=1).place(x=110, y=220)
+tk.Radiobutton(window, text="玩家對戰", variable=check_mode.mode, value=0).place(x=110, y=250)
+
+
+def battle_disp(v, team=4):
     if v:
         time.sleep(cd)
-    yui_discourse.insert('end', v)
+    if team == 1:
+        yui_discourse.insert('end', v, 't1')
+    elif team in [2, 3]:
+        yui_discourse.insert('end', v, 't2')
+    else:
+        yui_discourse.insert('end', v)
     yui_discourse.insert('end', '\n')
     yui_discourse.see('end')
+
+
+hero_dps = ['蕾吉娜', '喬恩', '薇莉安娜', '琉塔', '瑪格麗特', '伊利亞', '莉姬亞', '奈菲提', '莉布絲']
+hero_t = ['貝羅斯', '哈拉爾德']
+hero_heal = ['塞萊茜布', '歐若拉', '多米妮安']
+boss = ['西里烏斯', '少爺', '卡伊達', '黃泉引路人', '安朵蕾雅絲', '船長格林威治', '哈密特', '克維德', '普羅斯佩羅', '坦博拉']
+
+test_mode = False
 
 
 class YuiStart(threading.Thread):
@@ -1010,108 +1378,242 @@ class YuiStart(threading.Thread):
         return False
 
     def run(self):
-        global ongoing
-        t1_tmp = [copy.deepcopy(all_hero[x]) for x in t1 if x]
-        t2_tmp = [copy.deepcopy(all_hero[x]) for x in t2 if x]
-        all = t1_tmp + t2_tmp
-        add_summon(t1_tmp)
-        add_summon(t2_tmp)
-        #for a in t1_tmp + t2_tmp:
-         #   a.hp = int(a.hp * 10)
-         #   a.hp_now = int(a.hp_now * 10)
-        count = 1
-        stop = False
-        while 1:
-            if count == 21:
-                count = 20
-                battle_disp('戰鬥超時，挑戰失敗')
-                break
-            battle_disp('')
-            battle_disp('第' + str(count) + '回合')
-            battle_disp('')
-            random.shuffle(t1_tmp)
-            random.shuffle(t2_tmp)
+        global ongoing, t1, t2, t3
+        if check_mode.mode.get() == 1:  # pve
+            mode_now = 'pve'
+        else:
+            mode_now = 'pvp'
+        stat = {}
+        stat2 = {}
+        result = ''
+        n_battle = 1
+        if test_mode:
+            n_battle = 1000
+        for _ in range(n_battle):
+            if test_mode:
+                t1 = random.sample(hero_t, 1) + random.sample(hero_heal, 1) + random.sample(hero_dps, 3)
+                t2 = [random.choice(boss)]
+                if t2[0] == '卡伊達':
+                    t2.append('阿蒂雅')
+                for a in t1:
+                    if a not in stat:
+                        stat[a] = {'戰': 0, '勝': 0, '敗': 0, '超時': 0, '勝率': 0, '超時率': 0}
+
+                if t2[0] not in stat2:
+                    stat2[t2[0]] = {'戰': 0, '勝': 0, '敗': 0, '超時': 0, '勝率': 0, '超時率': 0}
+
+            update_display(t1)
+            update_display2(t2)
+            t1_tmp = [copy.deepcopy(all_hero[x]) for x in t1 if x]
             for a in t1_tmp:
-                if a.env:
-                    a.env.act(t1_tmp, t2_tmp)
-                    if self.check_stop():
-                        stop = True
+                a.team = 1
+            if mode_now == 'pve':
+                max_count = 21
+                t2_tmp = [copy.deepcopy(all_hero[x]) for x in t2 if x]
+                for a in t2_tmp:
+                    a.team = 2
+            else:  # pvp
+                max_count = inf
+                t2_tmp = [copy.deepcopy(all_hero[x]) for x in t3 if x]
+                for a in t2_tmp:
+                    a.team = 3
+            all = t1_tmp + t2_tmp
+            add_summon(t1_tmp)
+            add_summon(t2_tmp)
+
+            #for a in t1_tmp:
+             #   a.hp = int(a.hp * 100)
+              #  a.hp_now = int(a.hp_now * 100)
+            #for a in t2_tmp:
+             #   a.hp = int(a.hp * 10)
+              #  a.hp_now = int(a.hp_now * 10)
+            if mode_now == 'pvp':
+                for a in t1_tmp:
+                    a.hp = int(a.hp * 2)
+                    a.hp_now = int(a.hp_now * 2)
+                for a in t2_tmp:
+                    a.hp = int(a.hp * 2)
+                    a.hp_now = int(a.hp_now * 2)
+
+            count = 1
+            stop = False
+            while 1:  # 戰鬥循環
+                if count == max_count:
+                    count = 20
+                    battle_disp('戰鬥超時，挑戰失敗')
+                    #battle_disp('時間切れ')
+                    result = '超時'
+                    break
+                battle_disp('')
+                battle_disp('第' + str(count) + '回合')
+                #battle_disp(str(count) + 'ターン目')
+                battle_disp('')
+                random.shuffle(t1_tmp)
+                random.shuffle(t2_tmp)
+                if mode_now == 'pve':
+                    for a in t1_tmp:
+                        if a.env:
+                            a.env.act(t1_tmp, t2_tmp)
+                            if self.check_stop():
+                                stop = True
+                                break
+                    if stop:
                         break
-            if stop:
-                break
-            for a in t2_tmp:
-                if a.env:
-                    a.env.act(t2_tmp, t1_tmp)
-                    if self.check_stop():
-                        stop = True
+                    for a in t2_tmp:
+                        if a.env:
+                            a.env.act(t2_tmp, t1_tmp)
+                            if self.check_stop():
+                                stop = True
+                                break
+                    if stop:
                         break
-            if stop:
-                break
-            for a in t1_tmp:
-                if a.hp_now > 0:
-                    a.act(t1_tmp, t2_tmp)
-                if self.check_stop():
-                    stop = True
+                    for a in t1_tmp:
+                        if a.hp_now > 0:
+                            a.act(t1_tmp, t2_tmp)
+                        if self.check_stop():
+                            stop = True
+                            break
+                    if stop:
+                        break
+                    for a in t2_tmp:
+                        if a.hp_now > 0:
+                            a.act(t2_tmp, t1_tmp)
+                        if self.check_stop():
+                            stop = True
+                            break
+                else:
+                    t1_act = iter(t1_tmp)
+                    t2_act = iter(t2_tmp)
+                    t1_over = False
+                    t2_over = False
+                    while True:
+                        if t1_over and t2_over:
+                            break
+                        elif t1_over:
+                            t_act = t2_act
+                            chose = 2
+                        elif t2_over:
+                            t_act = t1_act
+                            chose = 1
+                        else:
+                            if random.randint(0, 1):
+                                t_act = t1_act
+                                chose = 1
+                            else:
+                                t_act = t2_act
+                                chose = 2
+                        try:
+                            a = next(t_act)
+                            if a.hp_now > 0:
+                                if a.team == 1:
+                                    a.act(t1_tmp, t2_tmp)
+                                else:
+                                    a.act(t2_tmp, t1_tmp)
+                        except StopIteration:
+                            if chose == 1:
+                                t1_over = True
+                            else:
+                                t2_over = True
+                        if self.check_stop():
+                            stop = True
+                            break
+                if stop:
                     break
-            if stop:
-                break
-            for a in t2_tmp:
-                if a.hp_now > 0:
-                    a.act(t2_tmp, t1_tmp)
-                if self.check_stop():
-                    stop = True
+
+                t1_alive = False
+                t2_alive = False
+                for a in t1_tmp:
+                    if not a.master and a.hp_now > 0:
+                        t1_alive = True
+                        break
+                for a in t2_tmp:
+                    if not a.master and a.hp_now > 0:
+                        t2_alive = True
+                        break
+
+                if not t1_alive and not t2_alive:
+                    if mode_now == 'pve':
+                        battle_disp('同歸於盡，挑戰失敗')
+                        #battle_disp('戦闘敗北')
+                    else:
+                        battle_disp('同歸於盡，平手')
+                    result = '敗'
                     break
-            if stop:
-                break
-            t1_alive = False
-            t2_alive = False
-            for a in t1_tmp:
-                if not a.master and a.hp_now > 0:
-                    t1_alive = True
+                elif not t1_alive:
+                    if mode_now == 'pve':
+                        battle_disp('挑戰失敗')
+                        #battle_disp('戦闘勝利')
+                    else:
+                        battle_disp('隊伍2勝利')
+                    result = '敗'
                     break
-            for a in t2_tmp:
-                if not a.master and a.hp_now > 0:
-                    t2_alive = True
+                elif not t2_alive:
+                    if mode_now == 'pve':
+                        battle_disp('挑戰成功')
+                        #battle_disp('戦闘敗北')
+                    else:
+                        battle_disp('隊伍1勝利')
+                    result = '勝'
                     break
 
-            if not t1_alive and not t2_alive:
-                battle_disp('同歸於盡，挑戰失敗')
-                break
-            elif not t1_alive:
-                battle_disp('挑戰失敗')
-                break
-            elif not t2_alive:
-                battle_disp('挑戰成功')
-                #stat[1] += 1
-                break
+                count += 1
 
-            count += 1
+            battle_disp('總回合' + str(count))
+            #battle_disp('ターン数' + str(count))
 
-        #print('挑戰/勝利', stat)
+            hp_all = '傷害統計：\n'
+            #hp_all = 'ダメージ統計：\n'
+            for a in all:
+                hp_all += a.name
+                if mode_now == 'pvp':
+                    hp_all += '(team'
+                    if a.team == 1:
+                        hp_all += '1)'
+                    else:
+                        hp_all += '2)'
+                hp_all += '：'
+                hp_all += str(a.dps)
+                hp_all += '，'
+            hp_all = hp_all[:-1]
+            battle_disp('')
+            battle_disp(hp_all)
 
-        battle_disp('總回合' + str(count))
+            hp_all = '治療統計：\n'
+            #hp_all = '回復統計：\n'
+            for a in all:
+                hp_all += a.name
+                if mode_now == 'pvp':
+                    hp_all += '(team'
+                    if a.team == 1:
+                        hp_all += '1)'
+                    else:
+                        hp_all += '2)'
+                    hp_all += ')'
+                hp_all += '：'
+                hp_all += str(a.heal)
+                hp_all += '，'
+            hp_all = hp_all[:-1]
+            battle_disp('')
+            battle_disp(hp_all)
+            with lock:
+                ongoing = []
 
-        hp_all = '傷害統計："\n"'
-        for a in all:
-            hp_all += a.name
-            hp_all += '：'
-            hp_all += str(a.dps)
-            hp_all += '，'
-        hp_all = hp_all[:-1]
-        battle_disp('')
-        battle_disp(hp_all)
-
-        hp_all = '治療統計："\n"'
-        for a in all:
-            hp_all += a.name
-            hp_all += '：'
-            hp_all += str(a.heal)
-            hp_all += '，'
-        hp_all = hp_all[:-1]
-        battle_disp('')
-        battle_disp(hp_all)
-        with lock:
-            ongoing = []
+            if test_mode:
+                for a in t1:
+                    stat[a]['戰'] += 1
+                    stat[a][result] += 1
+                    stat[a]['勝率'] = round(stat[a]['勝']/stat[a]['戰'], 2)
+                    stat[a]['超時率'] = round(stat[a]['超時'] / stat[a]['戰'], 2)
+                stat2[t2[0]]['戰'] += 1
+                stat2[t2[0]][result] += 1
+                stat2[t2[0]]['勝率'] = round(stat2[t2[0]]['勝'] / stat2[t2[0]]['戰'], 2)
+                stat2[t2[0]]['超時率'] = round(stat2[t2[0]]['超時'] / stat2[t2[0]]['戰'], 2)
+                for k in stat:
+                    print(k, stat[k])
+                print('')
+                for k in stat2:
+                    print(k, stat2[k])
+                print('')
 
 
 ongoing = []
@@ -1121,16 +1623,18 @@ def start_battle():
     global ongoing
     global cd
     with lock:
-        update_display(t1)
-        update_display2(t2)
         if not ongoing:
             if t1.count(None) == 5:
                 battle_disp('')
                 battle_disp('系統消息：請選擇至少一名英雄')
                 battle_disp('')
-            elif t2.count(None) == 2:
+            elif check_mode.mode.get() == 1 and t2.count(None) == 2:
                 battle_disp('')
                 battle_disp('系統消息：請選擇要挑戰的BOSS')
+                battle_disp('')
+            elif check_mode.mode.get() == 0 and t3.count(None) == 5:
+                battle_disp('')
+                battle_disp('系統消息：請選擇至少一名英雄')
                 battle_disp('')
             else:
                 cd = cd_var.get()/2
@@ -1138,8 +1642,6 @@ def start_battle():
                 yui_start = YuiStart()
                 ongoing.append(yui_start)
                 yui_start.start()
-
-                #stat[0] += 1
 
 
 def stop_battle():
@@ -1149,15 +1651,27 @@ def stop_battle():
             ongoing[0].stop = True
 
 
-#stat = [0, 0]
-
-
 b1 = tk.Button(window, text='開始戰鬥', font=('Arial', 12), width=10, height=1, command=start_battle)
+#b1 = tk.Button(window, text='戦闘開始', font=('Arial', 12), width=10, height=1, command=start_battle)
 b1.pack()
-b1.place(x=400, y=350)
+b1.place(x=400, y=370)
 
 b1 = tk.Button(window, text='停止戰鬥', font=('Arial', 12), width=10, height=1, command=stop_battle)
+#b1 = tk.Button(window, text='戦闘中止', font=('Arial', 12), width=10, height=1, command=start_battle)
 b1.pack()
-b1.place(x=530, y=350)
+b1.place(x=530, y=370)
+
+
+def random_team():
+    global t1, t3
+    t1 = random.sample(hero_t, 1) + random.sample(hero_heal, 1) + random.sample(hero_dps, 3)
+    t3 = random.sample(hero_t, 1) + random.sample(hero_heal, 1) + random.sample(hero_dps, 3)
+    update_display(t1)
+    update_display(t3, 3)
+
+
+b3 = tk.Button(window, text='隨機生成隊伍', font=('Arial', 12), width=10, height=1, command=random_team)
+b3.pack()
+b3.place(x=280, y=370)
 
 window.mainloop()
