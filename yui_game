@@ -6,7 +6,7 @@ import random
 import time
 from decimal import *
 
-yui_dir = 'D:\game_data/'
+yui_dir = 'game_data/'
 
 
 def target_chose(team, mode='min'):
@@ -241,6 +241,12 @@ class YuiAgent:
                         if d1.name not in ['中毒', '血怒', '侵蝕', '血迷い']:
                             for d2 in orb.debuff:
                                 if d1.name == d2.name:
+                                    if d1.name == '凍僵':
+                                        d2.offset(orb)
+                                        orb.debuff.remove(d2)
+                                        d1 = YuiDebuff('凍結', last=1)
+                                        orb.debuff.append(d1)
+                                        d1.onset(orb)
                                     check = False
                                     break
                         if check:
@@ -279,7 +285,7 @@ class YuiAgent:
     def act(self, t1, t2):
         speed_cost = 0
         for d in self.debuff:
-            if d.name in ['恐懼', '靜止']:
+            if d.name in ['恐懼', '靜止', '凍結']:
                 battle_disp(self.name + '受到' + d.name + '的影響，無法行動', self.team)
                 speed_cost += inf
                 break
@@ -789,6 +795,23 @@ s = YuiSkill('血怒', target='self', dmg=0)
 s.debuff = YuiBuff('血怒', '攻擊力', 1, last=2)
 tambora.passive.append(s)
 
+doudaiev = YuiAgent('杜達耶夫', hp=1600, atk=20, df=15)
+blizzard = YuiAgent('暴風雪', hp=1, atk=10, df=0)
+s = YuiSkill('吹襲', r=3, cd=2)
+s.debuff = YuiDebuff('凍僵', '速度', 30, last=2)
+blizzard.skill.append(s)
+s = YuiSummon('呼風喚雪', cd=inf, summon=blizzard)
+s.is_env = True
+doudaiev.skill.append(s)
+s = YuiSkill('絕對零度', dmg=20, cd=inf, r=3)
+s.cond = 50
+s.debuff = YuiDebuff('凍結', last=1)
+doudaiev.skill.append(s)
+s = YuiSkill('寒冰炸彈', dmg=15, cd=2, r=2)
+s.debuff = YuiDebuff('凍僵', '速度', 30, last=2)
+doudaiev.skill.append(s)
+doudaiev.skill.append(YuiSkill('捅刺'))
+
 
 def add_summon(t):
     for mem in t:
@@ -811,7 +834,7 @@ all_hero = {'貝羅斯': belos, '塞萊茜布': celexib, '蕾吉娜': regina, '�
             '安朵蕾雅絲': andreas, '船長格林威治': greenwich,
             '哈密特': hammett, '克維德': covid,
             '普羅斯佩羅': prospero, '骷髏兵1': skeleton1, '骷髏兵2': skeleton2,
-            '坦博拉': tambora}
+            '坦博拉': tambora, '杜達耶夫': doudaiev}
 
 
 t1 = [None, None, None, None, None]
@@ -997,7 +1020,8 @@ images = {
     "普羅斯佩羅": load_image(yui_dir + "普羅斯佩羅.png"),
     "骷髏兵": load_image(yui_dir + "骷髏兵.png"),
     "骨龍": load_image(yui_dir + "骨龍.png"),
-    "坦博拉": load_image(yui_dir + "坦博拉.png")
+    "坦博拉": load_image(yui_dir + "坦博拉.png"),
+    "杜達耶夫": load_image(yui_dir + "杜達耶夫.png")
 }
 
 for i, choice in enumerate(t1):
@@ -1233,6 +1257,7 @@ menu6.add_command(label="哈密特（弱化型）", command=lambda: add_boss('�
 menu6.add_command(label="克維德（持續傷害型）", command=lambda: add_boss('克維德'))
 menu6.add_command(label="普羅斯佩羅(增益型）", command=lambda: add_boss('普羅斯佩羅'))
 menu6.add_command(label="坦博拉（狂戰士型）", command=lambda: add_boss('坦博拉'))
+menu6.add_command(label="杜達耶夫（控制型）", command=lambda: add_boss('杜達耶夫'))
 '''
 menu6.add_command(label="シリウス（治療系）", command=lambda: add_boss('西里烏斯'))
 menu6.add_command(label="『坊や』（暗殺者系）", command=lambda: add_boss('少爺'))
