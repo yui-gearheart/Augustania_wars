@@ -55,56 +55,80 @@ BOSS：
 
 英雄介紹：
 
-<img width="774" height="474" alt="image" src="https://github.com/user-attachments/assets/0caf920d-3199-468d-95d5-ff5a57547d03" />
+貝羅斯
+<img width="772" height="504" alt="image" src="https://github.com/user-attachments/assets/18d5e490-dac9-44b9-9e3b-d0654883f6ea" />
 
-<img width="776" height="476" alt="image" src="https://github.com/user-attachments/assets/9cd1af9a-06c3-4c70-96bb-6e18399502d0" />
+塞萊茜布
+<img width="778" height="474" alt="image" src="https://github.com/user-attachments/assets/7ed1c511-8614-456c-bfb0-faf5f1196a89" />
 
-<img width="776" height="568" alt="image" src="https://github.com/user-attachments/assets/c2f051fa-0f44-4cde-853e-6ab7cfc48002" />
+蕾吉娜
+<img width="774" height="560" alt="image" src="https://github.com/user-attachments/assets/630e8633-f435-4189-b0bd-579e065affd4" />
 
-<img width="776" height="892" alt="image" src="https://github.com/user-attachments/assets/f20c197b-029d-4c92-b004-d68af41921c0" />
+喬恩
+<img width="776" height="888" alt="image" src="https://github.com/user-attachments/assets/65501d91-1d1b-4dae-ba1a-b46fce69e25f" />
 
-<img width="776" height="562" alt="image" src="https://github.com/user-attachments/assets/cc493f0a-9719-4421-b2e7-410bf3b7a365" />
+薇莉安娜
+<img width="774" height="560" alt="image" src="https://github.com/user-attachments/assets/e3dd4f38-fbcd-4253-881e-750b7ab786c3" />
 
-<img width="774" height="560" alt="image" src="https://github.com/user-attachments/assets/68997f4f-01fd-4e53-93a1-daee81dd9a6d" />
+琉塔
+<img width="774" height="560" alt="image" src="https://github.com/user-attachments/assets/93f44754-8227-486b-a2bf-7ee6b8419c0c" />
 
-<img width="774" height="530" alt="image" src="https://github.com/user-attachments/assets/93efd20f-81d5-4c8e-ba09-0e64a78984cd" />
+哈拉爾德
+<img width="774" height="562" alt="image" src="https://github.com/user-attachments/assets/9c599974-353f-407f-8635-7703ddb36588" />
 
-<img width="778" height="564" alt="image" src="https://github.com/user-attachments/assets/2557ff77-637c-4f20-b673-916adb44498e" />
+瑪格麗特
+<img width="776" height="560" alt="image" src="https://github.com/user-attachments/assets/91b8e475-0259-42d4-acd2-b382829819d4" />
 
-<img width="778" height="564" alt="image" src="https://github.com/user-attachments/assets/f56dbd43-3a83-4a28-b66b-f4cf91f0aedf" />
+歐若拉
+<img width="770" height="558" alt="image" src="https://github.com/user-attachments/assets/91f17fca-2dff-4f05-999f-73f5b7cf66b8" />
 
-<img width="772" height="596" alt="image" src="https://github.com/user-attachments/assets/a03bcad0-2e47-42af-8a81-ba9fea665e84" />
+莉布絲
+<img width="774" height="582" alt="image" src="https://github.com/user-attachments/assets/7d0879b1-b1f9-4c80-aff9-d04ca61dc127" />
 
-<img width="780" height="514" alt="image" src="https://github.com/user-attachments/assets/2af0669d-31b7-4e4d-8f7a-a08dd9eabbf5" />
+伊利亞
+<img width="778" height="598" alt="image" src="https://github.com/user-attachments/assets/fc07935b-52a8-4a56-9cf4-a2d0bfcab206" />
 
-<img width="774" height="544" alt="image" src="https://github.com/user-attachments/assets/58b51a63-c3f9-47eb-b82a-becd0ac72e61" />
+奈菲提
+<img width="774" height="562" alt="image" src="https://github.com/user-attachments/assets/cdf83245-d547-4cb8-bcfc-b73c5becd31f" />
+
+多米妮安
+<img width="772" height="510" alt="image" src="https://github.com/user-attachments/assets/3d4b95c6-8e6d-47fe-979d-ef8b57dafd7e" />
+
+莉姬亞
+<img width="774" height="598" alt="image" src="https://github.com/user-attachments/assets/f12fde9c-5b6f-421e-a667-00dc4d000273" />
 
 
 BOSS介紹：
 
-<img width="774" height="732" alt="image" src="https://github.com/user-attachments/assets/d48aaf7a-2082-4d52-a19d-33b7836a380a" />
+西里烏斯：
+<img width="1020" height="902" alt="image" src="https://github.com/user-attachments/assets/1af52c36-cbb0-4b37-82df-149d02e2e152" />
 
-<img width="774" height="738" alt="image" src="https://github.com/user-attachments/assets/0ab27494-90c1-4fd5-ba72-fc13eb20a083" />
+少爺
+<img width="1016" height="964" alt="image" src="https://github.com/user-attachments/assets/728fe546-a426-44c7-aede-5074ed7ee3db" />
 
-<img width="772" height="928" alt="image" src="https://github.com/user-attachments/assets/c6ba37be-b17c-4445-ae2a-eeaf9145e51b" />
+卡伊達&阿蒂雅
+<img width="1018" height="1224" alt="image" src="https://github.com/user-attachments/assets/62837007-bde5-4d18-9439-219d781961e6" />
 
-<img width="776" height="688" alt="image" src="https://github.com/user-attachments/assets/319cf8a2-0c3b-4a55-aaa8-a5de470614ca" />
+黃泉引路人
+<img width="1018" height="950" alt="image" src="https://github.com/user-attachments/assets/06684741-3c15-46f7-9b77-fc3fcc05b16a" />
 
-<img width="774" height="710" alt="image" src="https://github.com/user-attachments/assets/17e2ed6f-a502-4f0c-a44f-92f2d0d2209b" />
+安朵蕾雅絲
+<img width="1020" height="930" alt="image" src="https://github.com/user-attachments/assets/fdc241c1-1814-4ec8-a66e-c37dd68a9d5f" />
 
-<img width="800" height="854" alt="image" src="https://github.com/user-attachments/assets/eb153c2f-b965-45b3-943e-6702c7d520d2" />
+船長格林威治
+<img width="1020" height="856" alt="image" src="https://github.com/user-attachments/assets/540eed62-21b6-4501-bf78-09211e1d242a" />
 
-<img width="774" height="728" alt="image" src="https://github.com/user-attachments/assets/24a15bc3-0f0e-4ea7-870e-dcb783ce3ae8" />
+哈密特
+<img width="1048" height="988" alt="image" src="https://github.com/user-attachments/assets/7527e7b1-5d08-4c5c-a13e-1791fb305c9b" />
 
-<img width="774" height="846" alt="image" src="https://github.com/user-attachments/assets/793e65ad-ed54-4a35-9227-90c31796de42" />
+克維德
+<img width="1016" height="946" alt="image" src="https://github.com/user-attachments/assets/ddc373dd-7602-4f58-915a-d40eca48634f" />
 
+普羅斯佩羅
+<img width="1020" height="1134" alt="image" src="https://github.com/user-attachments/assets/347938a7-127c-4be2-82f8-2aa023bf728e" />
 
-
-
-
-
-
-
+坦博拉
+<img width="1020" height="1112" alt="image" src="https://github.com/user-attachments/assets/81d4df65-e3ce-47b5-80c3-70a4c02b446d" />
 
 
 
