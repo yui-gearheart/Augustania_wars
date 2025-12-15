@@ -128,7 +128,8 @@ BOSS介紹：
 <img width="1020" height="1134" alt="image" src="https://github.com/user-attachments/assets/347938a7-127c-4be2-82f8-2aa023bf728e" />
 
 坦博拉
-<img width="1020" height="1112" alt="image" src="https://github.com/user-attachments/assets/81d4df65-e3ce-47b5-80c3-70a4c02b446d" />
+<img width="1018" height="1108" alt="image" src="https://github.com/user-attachments/assets/ca5b633a-363e-4da9-9c00-0adcd64b03a7" />
+
 
 
 
