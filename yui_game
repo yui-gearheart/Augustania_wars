@@ -44,9 +44,10 @@ class YuiAgent:
         self.hate = 0
         self.buff = []
         self.debuff = []
+        self.shield = 0
         self.summon_monster = []
         self.master = None
-        self.env = None
+        self.env = []
         self.evade = False
         self.resist = []
         self.orb = None
@@ -86,7 +87,7 @@ class YuiAgent:
                     battle_disp(self.name + '召喚了' + summon_monster.name, self.team)
                     #battle_disp(self.name + 'が' + summon_monster.name + 'を召喚した', self.team)
                     if s.is_env:
-                        self.env = summon_monster
+                        self.env.append(summon_monster)
                     else:
                         t1.append(summon_monster)
                     if summon_monster.name == '骨龍':
@@ -194,7 +195,6 @@ class YuiAgent:
                         dmg = round(dmg * 1.5)
                     battle_disp(self.name + '使用' + s.name + '，給' + orb.name + '造成了' + str(dmg) + '點' + c + '傷害', self.team)
                     #battle_disp(self.name + 'が' + s.name + 'を使って' + '、' + orb.name + 'に'+ str(dmg) + 'の' + c + 'ダメージを与えた', self.team)
-                    orb.use_skill(orb.passive, t2, t1)
                     if orb.name == '黃泉引路人':
                         if orb.hp_now / orb.hp > 0.5:
                             curse = max(1, int(dmg * 0.2))
@@ -231,6 +231,9 @@ class YuiAgent:
                         d.offset(orb)
                         del orb.debuff[i]
                         break
+                elif s.name == '離子護盾':
+                    self.shield = 200
+                    self.df += 5
 
                 d1 = s.debuff  # 異常狀態
                 if d1:
@@ -262,6 +265,18 @@ class YuiAgent:
                                 orb.debuff.append(d1)
                             d1.onset(orb)
 
+                if orb.shield and s.name != '傷害轉移':
+                    orb.shield -= dmg
+                    if orb.shield < 0:
+                        orb.shield = 0
+                        battle_disp('聖王·貝羅斯的離子護盾被打破', orb.team)
+                        update_hp_text(orb)
+                        orb.df -= 5
+                        orb.use_skill([s_charge], t2, t1)
+                    else:
+                        update_hp_text(orb)
+                    continue
+
                 orb.hp_now -= dmg
                 if orb.hp_now < 0:
                     dmg += orb.hp_now
@@ -270,7 +285,9 @@ class YuiAgent:
                     dmg = dmg + orb.hp_now - orb.hp
                     orb.hp_now = orb.hp
                 update_hp_text(orb)
+
                 if dmg > 0:  # 傷害統計
+                    orb.use_skill(orb.passive, t2, t1)
                     if self.master:
                         self.master.dps += dmg
                     else:
@@ -816,6 +833,18 @@ s.debuff = YuiDebuff('凍僵', '速度', 30, last=2)
 doudaiev.skill.append(s)
 doudaiev.skill.append(YuiSkill('捅刺'))
 
+david = YuiAgent('聖王·貝羅斯', hp=1600, atk=20, df=15)
+thunderstorm = YuiAgent('雷雲風暴', hp=1, atk=10, df=0)
+thunderstorm.skill.append(YuiSkill('雷擊', r=2))
+s = YuiSummon('雷雲風暴', cd=inf, summon=thunderstorm)
+s.is_env = True
+s.cond = 50
+david.skill.append(s)
+david.skill.append(YuiSkill('離子護盾', target='self', dmg=0, cd=3))
+david.skill.append(YuiSkill('球狀閃電', dmg=20, cd=2, r=2))
+david.skill.append(YuiSkill('錘擊'))
+s_charge = YuiSkill('電荷釋放', dmg=20, r=2)
+
 
 def add_summon(t):
     for mem in t:
@@ -833,12 +862,13 @@ window.geometry('1000x620')
 
 all_hero = {'貝羅斯': belos, '塞萊茜布': celexib, '蕾吉娜': regina, '喬恩': donnet, '艾莉安': elion,
             '薇莉安娜': willianna, '琉塔': lyuda, '哈拉爾德': harald, '瑪格麗特': margrete, '歐若拉': aurora,
-            '莉布絲':libuse, '奈菲提': neferti, '伊利亞': elijah, '斯特勒魯卡': strelka,'多米妮安': dominion, '莉姬亞': ligeia,
+            '莉布絲':libuse, '奈菲提': neferti, '伊利亞': elijah, '斯特勒魯卡': strelka, '多米妮安': dominion, '莉姬亞': ligeia,
             '西里烏斯': sirius, '少爺': bouya, '卡伊達': kaeda, '阿蒂雅': adeak, '黃泉引路人': way_guider,
             '安朵蕾雅絲': andreas, '船長格林威治': greenwich,
             '哈密特': hammett, '克維德': covid,
             '普羅斯佩羅': prospero, '骷髏兵1': skeleton1, '骷髏兵2': skeleton2,
-            '坦博拉': tambora, '杜達耶夫': doudaiev}
+            '坦博拉': tambora, '杜達耶夫': doudaiev,
+            '聖王·貝羅斯': david}
 
 
 t1 = [None, None, None, None, None]
@@ -983,7 +1013,10 @@ def update_hp_text(chara):
         name_t = names3
     for name2 in name_t:
         if name2['text'].startswith(name1):
-            name2.config(text=name1 + '\nHP:' + str(chara.hp_now) + '/' + str(chara.hp))
+            if chara.shield:
+                name2.config(text=name1 + '\nHP:' + str(chara.hp_now) + '('+str(chara.shield)+')/' + str(chara.hp))
+            else:
+                name2.config(text=name1 + '\nHP:' + str(chara.hp_now) + '/' + str(chara.hp))
             break
 
 
@@ -1025,7 +1058,8 @@ images = {
     "骷髏兵": load_image(yui_dir + "骷髏兵.png"),
     "骨龍": load_image(yui_dir + "骨龍.png"),
     "坦博拉": load_image(yui_dir + "坦博拉.png"),
-    "杜達耶夫": load_image(yui_dir + "杜達耶夫.png")
+    "杜達耶夫": load_image(yui_dir + "杜達耶夫.png"),
+    "聖王·貝羅斯": load_image(yui_dir + "貝羅斯.png"),
 }
 
 for i, choice in enumerate(t1):
@@ -1262,6 +1296,7 @@ menu6.add_command(label="克維德（持續傷害型）", command=lambda: add_bo
 menu6.add_command(label="普羅斯佩羅(增益型）", command=lambda: add_boss('普羅斯佩羅'))
 menu6.add_command(label="坦博拉（狂戰士型）", command=lambda: add_boss('坦博拉'))
 menu6.add_command(label="杜達耶夫（控制型）", command=lambda: add_boss('杜達耶夫'))
+menu6.add_command(label="聖王·貝羅斯（坦克型）", command=lambda: add_boss('聖王·貝羅斯'))
 '''
 menu6.add_command(label="シリウス（治療系）", command=lambda: add_boss('西里烏斯'))
 menu6.add_command(label="『坊や』（暗殺者系）", command=lambda: add_boss('少爺'))
@@ -1525,19 +1560,23 @@ class YuiStart(threading.Thread):
                 random.shuffle(t2_tmp)
                 if mode_now == 'pve':
                     for a in t1_tmp:
-                        if a.env:
-                            a.env.act(t1_tmp, t2_tmp)
+                        for env in a.env:
+                            env.act(t1_tmp, t2_tmp)
                             if self.check_stop():
                                 stop = True
                                 break
+                        if stop:
+                            break
                     if stop:
                         break
                     for a in t2_tmp:
-                        if a.env:
-                            a.env.act(t2_tmp, t1_tmp)
+                        for env in a.env:
+                            env.act(t2_tmp, t1_tmp)
                             if self.check_stop():
                                 stop = True
                                 break
+                        if stop:
+                            break
                     if stop:
                         break
                     for a in t1_tmp:
@@ -1755,3 +1794,4 @@ b4.pack()
 b4.place(x=150, y=370)
 
 window.mainloop()
+
