@@ -135,6 +135,10 @@ BOSS介紹：
 坦博拉
 <img width="1018" height="1108" alt="image" src="https://github.com/user-attachments/assets/ca5b633a-363e-4da9-9c00-0adcd64b03a7" />
 
+杜達耶夫
+<img width="740" height="852" alt="image" src="https://github.com/user-attachments/assets/0dbb3659-6eaa-464b-af00-47413c299ce1" />
+
+
 
 
 
