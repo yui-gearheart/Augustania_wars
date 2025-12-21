@@ -1,3 +1,4 @@
+
 import tkinter as tk
 from PIL import Image, ImageTk
 import threading
@@ -246,6 +247,14 @@ class YuiAgent:
                 elif s.name == '離子護盾':
                     self.shield = 200
                     self.df += 5
+                elif s.name == '光合作用':
+                    battle_disp('食人花生長了，生命力、攻擊力提高', self.team)
+                    for p in self.summon_monster:
+                        if p.name.startswith('食人花'):
+                            p.atk += 2
+                            p.hp_now += 20
+                            p.hp += 20
+                            update_hp_text(p)
 
                 d1 = s.debuff  # 異常狀態
                 if d1:
@@ -854,6 +863,23 @@ david.skill.append(YuiSkill('球狀閃電', dmg=20, cd=2, r=2))
 david.skill.append(YuiSkill('錘擊'))
 s_charge = YuiSkill('電荷釋放', dmg=20, r=2)
 
+cybele = YuiAgent('西布莉', hp=2000, atk=20, df=15)
+pea = YuiAgent('食人花', hp=200, atk=14, df=15)
+pea.hate = -1
+pea.skill.append(YuiSkill('種子射擊'))
+for i in range(2):
+    pea_each = copy.deepcopy(pea)
+    pea_each.name += str(i + 1)
+    cybele.summon(pea_each)
+mushroom = YuiAgent('爆炸蘑菇', hp=1, atk=15, df=15)
+mushroom.dead.append(YuiSkill('爆炸', dmg=15, r=2))
+s = YuiSkill('巨樹地鳴', dmg=30, cd=inf, r=3)
+s.cond = 50
+cybele.skill.append(s)
+cybele.skill.append(YuiSummon('召喚蘑菇', summon=mushroom, cd=1))
+cybele.skill.append(YuiSkill('光合作用', dmg=0, cd=2))
+cybele.skill.append(YuiSkill('捅刺'))
+
 
 def add_summon(t):
     for mem in t:
@@ -877,7 +903,7 @@ all_hero = {'貝羅斯': belos, '塞萊茜布': celexib, '蕾吉娜': regina, '�
             '哈密特': hammett, '馬里阿努斯': marianus, '克維德': covid,
             '普羅斯佩羅': prospero, '骷髏兵1': skeleton1, '骷髏兵2': skeleton2,
             '坦博拉': tambora, '杜達耶夫': doudaiev,
-            '聖王·貝羅斯': david}
+            '聖王·貝羅斯': david, '西布莉': cybele, '食人花': pea}
 
 
 t1 = [None, None, None, None, None]
@@ -1078,6 +1104,8 @@ images = {
     "坦博拉": load_image(yui_dir + "坦博拉.png"),
     "杜達耶夫": load_image(yui_dir + "杜達耶夫.png"),
     "聖王·貝羅斯": load_image(yui_dir + "貝羅斯.png"),
+    "西布莉": load_image(yui_dir + "西布莉.png"),
+    "食人花": load_image(yui_dir + "食人花.png"),
 }
 
 for i, choice in enumerate(t1):
@@ -1126,6 +1154,11 @@ def update_display2(t2):
                 names2[1].config(text=get_hp_text('骷髏兵1'))
                 icons2[2].config(image=images['骷髏兵'])
                 names2[2].config(text=get_hp_text('骷髏兵2'))
+            if choice == '西布莉':
+                icons2[1].config(image=images['食人花'])
+                names2[1].config(text='食人花1\nHP:200/200')
+                icons2[2].config(image=images['食人花'])
+                names2[2].config(text='食人花2\nHP:200/200')
         else:
             icons2[i].config(image=images['空白'])
             names2[i].config(text='')
@@ -1322,6 +1355,7 @@ menu6.add_command(label="普羅斯佩羅(增益型）", command=lambda: add_boss
 menu6.add_command(label="坦博拉（狂戰士型）", command=lambda: add_boss('坦博拉'))
 menu6.add_command(label="杜達耶夫（控制型）", command=lambda: add_boss('杜達耶夫'))
 menu6.add_command(label="聖王·貝羅斯（坦克型）", command=lambda: add_boss('聖王·貝羅斯'))
+menu6.add_command(label="西布莉（發展型）", command=lambda: add_boss('西布莉'))
 '''
 menu6.add_command(label="シリウス（治療系）", command=lambda: add_boss('西里烏斯'))
 menu6.add_command(label="『坊や』（暗殺者系）", command=lambda: add_boss('少爺'))
@@ -1484,7 +1518,8 @@ def battle_disp(v, team=4):
 hero_dps = ['蕾吉娜', '喬恩', '薇莉安娜', '琉塔', '瑪格麗特', '伊利亞', '莉姬亞', '奈菲提', '莉布絲', '斯特勒魯卡']
 hero_t = ['貝羅斯', '哈拉爾德']
 hero_heal = ['塞萊茜布', '歐若拉', '多米妮安']
-boss = ['西里烏斯', '少爺', '卡伊達', '黃泉引路人', '安朵蕾雅絲', '船長格林威治', '哈密特', '馬里阿努斯', '克維德', '普羅斯佩羅', '坦博拉', '杜達耶夫']
+boss = ['西里烏斯', '少爺', '卡伊達', '黃泉引路人', '安朵蕾雅絲', '船長格林威治', '哈密特', '馬里阿努斯', '克維德', '普羅斯佩羅', '坦博拉',
+        '杜達耶夫', '聖王·貝羅斯', '西布莉']
 
 test_mode = False
 
@@ -1560,11 +1595,11 @@ class YuiStart(threading.Thread):
                 name_ship.config(text='船\nHP: 500/500')
 
             #for a in t1_tmp:
-            #    a.hp = int(a.hp * 100)
-            #    a.hp_now = int(a.hp_now * 100)
+             #   a.hp = int(a.hp * 100)
+              #  a.hp_now = int(a.hp_now * 100)
             #for a in t2_tmp:
-            #    a.hp = int(a.hp * 10)
-            #    a.hp_now = int(a.hp_now * 10)
+             #   a.hp = int(a.hp * 10)
+              #  a.hp_now = int(a.hp_now * 10)
             #max_count = inf
 
             if mode_now == 'pvp':
