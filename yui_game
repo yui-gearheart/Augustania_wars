@@ -7,7 +7,7 @@ import random
 import time
 from decimal import *
 
-yui_dir = 'game_data/'
+yui_dir = 'D:/game_data/'
 
 
 def target_chose(team, mode='min'):
@@ -104,6 +104,9 @@ class YuiAgent:
                     if summon_monster.name == '骨龍':
                         icons2[3].config(image=images['骨龍'])
                         names2[3].config(text='骨龍\nHP:' + str(summon_monster.hp_now) + '/' + str(summon_monster.hp))
+                    elif summon_monster.name == '大食人花':
+                        icons2[3].config(image=images['食人花'])
+                        names2[3].config(text='大食人花\nHP:200/200')
                     s.cd_now = s.cd
                 continue
 
@@ -873,7 +876,10 @@ for i in range(2):
     cybele.summon(pea_each)
 mushroom = YuiAgent('爆炸蘑菇', hp=1, atk=15, df=15)
 mushroom.dead.append(YuiSkill('爆炸', dmg=15, r=2))
-s = YuiSkill('巨樹地鳴', dmg=30, cd=inf, r=3)
+pea2 = YuiAgent('大食人花', hp=200, atk=18, df=15)
+pea2.hate = -1
+pea2.skill.append(YuiSkill('多重射擊', r=2))
+s = YuiSummon('擴大種植', summon=pea2, cd=inf)
 s.cond = 50
 cybele.skill.append(s)
 cybele.skill.append(YuiSummon('召喚蘑菇', summon=mushroom, cd=1))
