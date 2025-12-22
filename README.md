@@ -50,11 +50,13 @@ BOSS：
 安朵蕾雅絲（群攻法師型）
 船長格林威治（控制型）
 哈密特（弱化型）
+馬里阿努斯（水戰型）
 克維德（持續傷害型）
 普羅斯佩羅(增益型）
 坦博拉（狂戰士型）
 杜達耶夫（控制型）
 聖王·貝羅斯（坦克型）
+西布莉（發展型）
 
 英雄介紹：
 
@@ -127,6 +129,9 @@ BOSS介紹：
 哈密特
 <img width="1048" height="988" alt="image" src="https://github.com/user-attachments/assets/7527e7b1-5d08-4c5c-a13e-1791fb305c9b" />
 
+馬里阿努斯
+<img width="726" height="676" alt="image" src="https://github.com/user-attachments/assets/8692a2d2-d52e-4762-954e-d99549b00fb8" />
+
 克維德
 <img width="1016" height="946" alt="image" src="https://github.com/user-attachments/assets/ddc373dd-7602-4f58-915a-d40eca48634f" />
 
@@ -141,6 +146,10 @@ BOSS介紹：
 
 聖王·貝羅斯
 <img width="1006" height="1058" alt="image" src="https://github.com/user-attachments/assets/090e93a9-7b65-444d-acda-940c2d62a1f9" />
+
+西布莉
+<img width="728" height="858" alt="image" src="https://github.com/user-attachments/assets/c3372dda-5551-4b50-8514-e34702655568" />
+
 
 
 
