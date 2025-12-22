@@ -130,7 +130,7 @@ BOSS介紹：
 <img width="1048" height="988" alt="image" src="https://github.com/user-attachments/assets/7527e7b1-5d08-4c5c-a13e-1791fb305c9b" />
 
 馬里阿努斯
-<img width="726" height="676" alt="image" src="https://github.com/user-attachments/assets/8692a2d2-d52e-4762-954e-d99549b00fb8" />
+<img width="886" height="826" alt="image" src="https://github.com/user-attachments/assets/e469bfa3-e11e-458b-973c-b9578a7aa9c9" />
 
 克維德
 <img width="1016" height="946" alt="image" src="https://github.com/user-attachments/assets/ddc373dd-7602-4f58-915a-d40eca48634f" />
@@ -142,13 +142,14 @@ BOSS介紹：
 <img width="1018" height="1108" alt="image" src="https://github.com/user-attachments/assets/ca5b633a-363e-4da9-9c00-0adcd64b03a7" />
 
 杜達耶夫
-<img width="740" height="852" alt="image" src="https://github.com/user-attachments/assets/0dbb3659-6eaa-464b-af00-47413c299ce1" />
+<img width="886" height="1024" alt="image" src="https://github.com/user-attachments/assets/7f85f328-8948-4792-a168-6b2ed7989a4c" />
 
 聖王·貝羅斯
 <img width="1006" height="1058" alt="image" src="https://github.com/user-attachments/assets/090e93a9-7b65-444d-acda-940c2d62a1f9" />
 
 西布莉
-<img width="728" height="858" alt="image" src="https://github.com/user-attachments/assets/c3372dda-5551-4b50-8514-e34702655568" />
+<img width="884" height="1038" alt="image" src="https://github.com/user-attachments/assets/9135a553-a22c-4199-9cba-a5174518dfe3" />
+
 
 
 
